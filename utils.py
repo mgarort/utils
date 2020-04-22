@@ -17,7 +17,7 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
 
     assert sum(split_fractions) == 1, 'split fractions must sum up to 1'
 
-    if type(df) == np.array:
+    if type(df) == np.ndarray:
         df = pd.DataFrame(df)
     
     if shuffle:
