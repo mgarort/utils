@@ -28,9 +28,9 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
     n_val = int(n_samples*split_fractions[1])
     n_test = int(n_samples*split_fractions[2])
 
-    train = df.loc[:n_train]
-    val = df.loc[n_train:n_val]
-    test = df.loc[n_train+n_val:n_test]
+    train = df.iloc[:n_train]
+    val = df.iloc[n_train:n_val]
+    test = df.iloc[n_train+n_val:n_test]
 
     if filename_root:
         train.to_csv(filename_root + '_train.tsv', sep='\t')
