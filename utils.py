@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from rdkit import Chem
+
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
 
@@ -38,3 +40,24 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
         test.to_csv(filename_root + '_test.tsv', sep='\t')
 
     return train, val, test
+
+def smile2canonsmile(smile):
+    mol = Chem.MolFromSmiles(smile)
+    canon_smile = Chem.MolToSmiles(mol,canonical=True)
+    return canon_smile
+
+def smile2inchi(smile):
+    mol = Chem.MolFromSmiles(smile)
+    inchi = Chem.inchi.MolToInchi(mol)
+    return inchi
+
+def smile2inchikey(smile):
+    mol = Chem.MolFromSmiles(smile)
+    inchikey = Chem.inchi.MolToInchiKey(mol)
+    return inchikey
+
+def inchi2canonsmile(inchi):
+    mol = Chem.inchi.MolFromInchi(inchi)
+    smile = Chem.MolToSmiles(mol,canonical=True)
+    return smile
+
