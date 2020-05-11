@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
 from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit.Chem import DataStructs
+
 
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
@@ -60,4 +63,12 @@ def inchi2canonsmile(inchi):
     mol = Chem.inchi.MolFromInchi(inchi)
     smile = Chem.MolToSmiles(mol,canonical=True)
     return smile
+
+def smiles2fp(smile,nBits=1024):
+    mol = Chem.MolFromSmiles(smile)
+    bitInfo={}
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, 3, bitInfo=bitInfo)
+    arr = np.zeros((1,))
+    DataStructs.ConvertToNumpyArray(fp, arr)
+    return arr, bitInfo
 
