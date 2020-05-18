@@ -64,7 +64,7 @@ def inchi2canonsmile(inchi):
     smile = Chem.MolToSmiles(mol,canonical=True)
     return smile
 
-def smiles2fp(smile,nBits=1024):
+def smile2fp(smile,nBits=1024):
     mol = Chem.MolFromSmiles(smile)
     bitInfo={}
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, 3, bitInfo=bitInfo)
@@ -72,3 +72,8 @@ def smiles2fp(smile,nBits=1024):
     DataStructs.ConvertToNumpyArray(fp, arr)
     return arr, bitInfo
 
+def smile2pdbfile(smile,filename,add_hydrogens=True):
+    mol = Chem.MolFromSmiles(ris)
+    if add_hydrogens:
+        mol = Chem.AddHs(mol)
+    Chem.MolToPDBFile(mol,filename)
