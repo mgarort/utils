@@ -72,8 +72,9 @@ def smile2fp(smile,nBits=1024):
     DataStructs.ConvertToNumpyArray(fp, arr)
     return arr, bitInfo
 
-def smile2pdbfile(smile,filename,add_hydrogens=True):
+def smile2pdbfile(smile,filename,add_hydrogens=True,random_seed=2342):
     mol = Chem.MolFromSmiles(ris)
     if add_hydrogens:
         mol = Chem.AddHs(mol)
+    AllChem.EmbedMolecule(mol,randomSeed=random_seed)
     Chem.MolToPDBFile(mol,filename)
