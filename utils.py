@@ -45,9 +45,13 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
     return train, val, test
 
 def smile2canonsmile(smile):
-    mol = Chem.MolFromSmiles(smile)
-    canon_smile = Chem.MolToSmiles(mol,canonical=True)
-    return canon_smile
+    try:
+        mol = Chem.MolFromSmiles(smile)
+        canon_smile = Chem.MolToSmiles(mol,canonical=True)
+        return canon_smile
+    except:
+        print('Some conversions failed.')
+        return None
 
 def smile2inchi(smile):
     mol = Chem.MolFromSmiles(smile)
