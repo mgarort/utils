@@ -76,9 +76,17 @@ def smile2fp(smile,nBits=1024):
     DataStructs.ConvertToNumpyArray(fp, arr)
     return arr, bitInfo
 
-def smile2pdbfile(smile,filename,add_hydrogens=True,random_seed=2342):
-    mol = Chem.MolFromSmiles(ris)
-    if add_hydrogens:
-        mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol,randomSeed=random_seed)
-    Chem.MolToPDBFile(mol,filename)
+def smile2pdbfile(smile,filename,add_hydrogens=True,random_seed=2342,n_attempts=10):
+    for idx_attempt in range(n_attempts):
+        try:
+            # Simple, meaningless expression to get a different random seed per attempt, 
+            # but still keep the first random seed to that which was set manually
+            random_seed = random_seed + idx_attempt * random_seed  
+            mol = Chem.MolFromSmiles(ris)
+            if add_hydrogens:
+                mol = Chem.AddHs(mol)
+            AllChem.EmbedMolecule(mol,randomSeed=random_seed)
+            Chem.MolToPDBFile(mol,filename)
+            return True  # If the try statement gets to the end without an error, exit function
+                         # and return True to indicate success
+    return False  # If none of the n_attempts succeeds, return False to indicate failure
