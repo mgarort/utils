@@ -82,11 +82,27 @@ def smile2pdbfile(smile,filename,add_hydrogens=True,random_seed=2342,n_attempts=
             # Simple, meaningless expression to get a different random seed per attempt, 
             # but still keep the first random seed to that which was set manually
             random_seed = random_seed + idx_attempt * random_seed  
-            mol = Chem.MolFromSmiles(ris)
+            mol = Chem.MolFromSmiles(smile)
             if add_hydrogens:
                 mol = Chem.AddHs(mol)
             AllChem.EmbedMolecule(mol,randomSeed=random_seed)
             Chem.MolToPDBFile(mol,filename)
-            return True  # If the try statement gets to the end without an error, exit function
-                         # and return True to indicate success
+            return True  # If the try statement gets to the end without an error, exit function and return True to indicate success
+        except:
+            pass
     return False  # If none of the n_attempts succeeds, return False to indicate failure
+
+def get_score_from_vina_logfile(logfile):
+    with open(logfile, 'r') as f:
+        counter_to_score = None
+        for each_line in f:
+            # Try to find the table header. Once found, count three lines to get the score
+            if counter_to_score is not None:
+                counter_to_score += 1
+            if counter_to_score == 3:
+                line_with_score = each_line
+                break
+            if 'mode |   affinity | dist from best mode' in each_line:
+                counter_to_score = 0
+        score = line_with_score.split()[1]
+        return score
