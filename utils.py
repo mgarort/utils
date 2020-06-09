@@ -3,7 +3,9 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
-
+import json
+import requests
+from datetime import date
 
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
@@ -106,3 +108,15 @@ def get_score_from_vina_logfile(logfile):
                 counter_to_score = 0
         score = line_with_score.split()[1]
         return score
+
+def get_pubchem_date(cid):
+    """Get the creation date of a compound in PubChem from the compound id (cid)"""
+    cid = str(cid)
+    rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
+    resp = requests.get(rest_request).json()
+    if 'Fault' in resp.keys():
+        print(resp['Fault']['Message'])
+        return 'None'
+    else:
+        creation_date = resp['InformationList']['Information'][0]['CreationDate']
+        return date(year=creation_date['Year'],month=creation_date['Month'],day=creation_date['Day'])
