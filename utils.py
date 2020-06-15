@@ -6,6 +6,7 @@ from rdkit.Chem import DataStructs
 import json
 import requests
 from datetime import date
+from functools import partial
 
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
@@ -54,6 +55,50 @@ def smile2canonsmile(smile):
     except:
         print('Some conversions failed.')
         return None
+
+
+def mol2morganfp(mol, nBits=1024, radius=3, return_bit_info=False):
+    bit_info = {}
+    fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits, bitInfo=bit_info)
+    fp_array = np.zeros((1,))
+    DataStructs.ConvertToNumpyArray(fp, fp_array)
+    if return_bit_info:
+        return fp_array, bit_info
+    else:
+        return fp_array
+
+
+def expand_chem_df(df,input_format,input_column,output_format,output_column):
+    """
+    Given a dataframe where each row is a molecule and each column is a chemical property or chemical id,
+    it returns the same dataframe with an additional column for a new chemical property or chemical id.
+    
+    df: Chemical dataframe to extend.
+    input_format: string indicating molecular identifier used as input (smiles, canon smiles, inchi...).
+    input_column: string indicating column name to use as input.
+    output_format: string indicating molecular identifier or property used as output (smiles, canon smiles, inchi, inchi key, morgan fingerprints...).
+    output_column: string indicating name of new column.
+    
+    returns: extended dataframe.
+    """
+
+    input_function = {'smiles': Chem.MolFromSmiles,
+                       'inchi': Chem.MolFromInchi,
+                      }
+    output_function = {'smiles': Chem.MolToSmiles,
+                        'canonsmiles': partial(Chem.MolToSmiles, canonical=True),
+                        'inchi': Chem.inchi.MolToInchi,
+                        'inchikey': Chem.inchi.MolToInchiKey,
+                        'morgan3fp': mol2morganfp,
+                        'morgan2fp': partial(mol2morganfp(radius=2)),
+                       }
+
+    df_tmp = df.copy()
+    df_tmp[output_column] = df_tmp[input_column]
+    df_tmp[output_column] = df_tmp[output_column].map(input_function[input_format])
+    df_tmp[output_column] = df_tmp[output_column].map(output_function[output_format])
+    return df_tmp
+
 
 def smile2inchi(smile):
     mol = Chem.MolFromSmiles(smile)
