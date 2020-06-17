@@ -68,6 +68,20 @@ def mol2morganfp(mol, nBits=1024, radius=3, return_bit_info=False):
         return fp_array
 
 
+def robustify(function):
+    def function_wrapper(x):
+        if x is None:
+            return None
+        else:
+            try:
+                result = function(x)
+                return result
+            except Exception as e:
+                print(e)
+                return None
+    return function_wrapper
+
+
 def expand_chem_df(df,input_format,input_column,output_format,output_column):
     """
     Given a dataframe where each row is a molecule and each column is a chemical property or chemical id,
@@ -90,13 +104,17 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column):
                         'inchi': Chem.inchi.MolToInchi,
                         'inchikey': Chem.inchi.MolToInchiKey,
                         'morgan3fp': mol2morganfp,
-                        'morgan2fp': partial(mol2morganfp(radius=2)),
+                        'morgan2fp': partial(mol2morganfp, radius=2),
                        }
 
     df_tmp = df.copy()
-    df_tmp[output_column] = df_tmp[input_column]
-    df_tmp[output_column] = df_tmp[output_column].map(input_function[input_format])
-    df_tmp[output_column] = df_tmp[output_column].map(output_function[output_format])
+    df_tmp[output_column] = df_tmp[input_column].copy()
+    # Conversion may cause errors, so decorate with robustify so that:
+    # 1. If row values are None to begin with, None is returned unchanged
+    # 2. If row values produce an error when function is executed, print error message and return None
+    # 3. If row values execute normally, execute and return result
+    df_tmp[output_column] = df_tmp[output_column].map(robustify(input_function[input_format]))
+    df_tmp[output_column] = df_tmp[output_column].map(robustify(output_function[output_format]))
     return df_tmp
 
 
