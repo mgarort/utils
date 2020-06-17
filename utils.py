@@ -82,7 +82,7 @@ def robustify(function):
     return function_wrapper
 
 
-def expand_chem_df(df,input_format,input_column,output_format,output_column):
+def expand_chem_df(df,input_format,input_column,output_format,output_column,keep_None=True):
     """
     Given a dataframe where each row is a molecule and each column is a chemical property or chemical id,
     it returns the same dataframe with an additional column for a new chemical property or chemical id.
@@ -92,6 +92,7 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column):
     input_column: string indicating column name to use as input.
     output_format: string indicating molecular identifier or property used as output (smiles, canon smiles, inchi, inchi key, morgan fingerprints...).
     output_column: string indicating name of new column.
+    keep_None: keep or delete null values None obtained either because the conversion failed or because the input was None to begin with. Default True.
     
     returns: extended dataframe.
     """
@@ -115,6 +116,8 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column):
     # 3. If row values execute normally, execute and return result
     df_tmp[output_column] = df_tmp[output_column].map(robustify(input_function[input_format]))
     df_tmp[output_column] = df_tmp[output_column].map(robustify(output_function[output_format]))
+    if not keep_None:
+        df_tmp = df_tmp.loc[~df_tmp[output_column].isnull()]
     return df_tmp
 
 
