@@ -7,6 +7,8 @@ import json
 import requests
 from datetime import date
 from functools import partial
+import matplotlib.pyplot as plt
+from sklearn.metrics import precision_recall_curve, average_precision_score
 
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
@@ -183,3 +185,40 @@ def get_pubchem_date(cid):
     else:
         creation_date = resp['InformationList']['Information'][0]['CreationDate']
         return date(year=creation_date['Year'],month=creation_date['Month'],day=creation_date['Day'])
+
+
+def plot_precision_recall_curve(decision_function,X,Y,legend_location='upper right',filename=None,print_average_precision=False):
+    """
+    Simple function to plot a precision-recall curve.
+
+    decision_function: from a sklearn classifier, for instance SVC().decision_function
+    X: input variables for all datapoints
+    Y: 0 and 1 labels for all datapoints
+    legend_location: location of the legend in the plot. By default in the lower right.
+    filename: if given, the plot will be saved to this location.
+    returns: None
+    """
+
+    D = decision_function(X)
+    prec, rec, _ = precision_recall_curve(Y, D)
+
+    plt.figure()
+    lw = 2
+    if print_average_precision:
+        ap = average_precision_score(Y, D)
+        label_message = 'Precision recall curve (average precision = %0.2f)' % ap
+    else:
+        label_message = None
+    plt.plot(rec, prec, color='darkorange',
+             lw=lw, label=label_message)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision recall curve')
+    plt.legend(loc=legend_location)
+    if filename is not None:
+        plt.savefig(filename)
+
+# TODO Similar function for ROC, with area under the curve. Get it from the file predict_antibacterial_activity_roc.py, in the graph grammar playground
