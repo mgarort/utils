@@ -69,6 +69,12 @@ def mol2morganfp(mol, nBits=1024, radius=3, return_bit_info=False):
 
 
 def robustify(function):
+    """
+    Function decorator that makes functions more robust and easier to integrate in pipelines, by adding the following rules:
+    - If the input to the function is None, do not execute. Instead, return None.
+    - If the function throws an error, do not stop execution. Instead, return None.
+    - Only if the input is valid, and the function completes successfully, return the function's result.
+    """
     def function_wrapper(x):
         if x is None:
             return None
@@ -80,6 +86,25 @@ def robustify(function):
                 print(e)
                 return None
     return function_wrapper
+
+
+class ConversionPipeline():
+    """
+    Used in my muticonverter expand_chem_df. It concatenates two functions together so that the intermediate 
+    RDKit molecule object does not need to be stored in an iterable such as a Pandas Series. This way, we can bypass
+    the memory leak detailed on the GitHub RDKit issue https://github.com/rdkit/rdkit/issues/3239
+    """
+
+    def __init__(self,input_function,output_function):
+        self.input_function = input_function
+        self.output_function = output_function
+
+    def run(self,compound):
+        mol = self.input_function(compound)
+        if mol is not None:
+            return self.output_function(mol)
+        else:
+            return None
 
 
 def expand_chem_df(df,input_format,input_column,output_format,output_column,keep_None=True):
@@ -97,25 +122,26 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column,keep
     returns: extended dataframe.
     """
 
-    input_function = {'smiles': Chem.MolFromSmiles,
-                       'inchi': Chem.MolFromInchi,
-                      }
-    output_function = {'smiles': Chem.MolToSmiles,
-                        'canonsmiles': partial(Chem.MolToSmiles, canonical=True),
-                        'inchi': Chem.inchi.MolToInchi,
-                        'inchikey': Chem.inchi.MolToInchiKey,
-                        'morgan3fp': mol2morganfp,
-                        'morgan2fp': partial(mol2morganfp, radius=2),
-                       }
+    # The input function will convert from a variety of molecular representations (SMILES, inchi...) to RDKit molecule object
+    input_function_catalog = {'smiles': Chem.MolFromSmiles,
+                              'inchi': Chem.MolFromInchi,
+                             }
+    # The output function will convert from RDKit molecule object to a molecular representation or property
+    output_function_catalog = {'smiles': Chem.MolToSmiles,
+                               'canonsmiles': partial(Chem.MolToSmiles, canonical=True),
+                               'inchi': Chem.inchi.MolToInchi,
+                               'inchikey': Chem.inchi.MolToInchiKey,
+                               'morgan3fp': partial(mol2morganfp, radius=3),
+                               'morgan2fp': partial(mol2morganfp, radius=2),
+                              }
+
+    # Concatenate input and output function
+    input_function = input_function_catalog[input_format]
+    output_function = output_function_catalog[output_format]
+    pipeline = ConversionPipeline(input_function,output_function)
 
     df_tmp = df.copy()
-    df_tmp[output_column] = df_tmp[input_column].copy()
-    # Conversion may cause errors, so decorate with robustify so that:
-    # 1. If row values are None to begin with, None is returned unchanged
-    # 2. If row values produce an error when function is executed, print error message and return None
-    # 3. If row values execute normally, execute and return result
-    df_tmp[output_column] = df_tmp[output_column].map(robustify(input_function[input_format]))
-    df_tmp[output_column] = df_tmp[output_column].map(robustify(output_function[output_format]))
+    df_tmp[output_column] = df_tmp[input_column].map(pipeline.run)
     if not keep_None:
         df_tmp = df_tmp.loc[~df_tmp[output_column].isnull()]
     return df_tmp
