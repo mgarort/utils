@@ -181,10 +181,12 @@ def smile2pdbfile(smile,filename,add_hydrogens=True,random_seed=2342,n_attempts=
                 mol = Chem.AddHs(mol)
             AllChem.EmbedMolecule(mol,randomSeed=random_seed)
             Chem.MolToPDBFile(mol,filename)
-            return True  # If the try statement gets to the end without an error, exit function and return True to indicate success
+            success_creating_pdb = True
+            return success_creating_pdb  # If the try statement gets to the end without an error, exit function and return True to indicate success
         except:
             pass
-    return False  # If none of the n_attempts succeeds, return False to indicate failure
+    success_creating_pdb = False
+    return success_creating_pdb  # If none of the n_attempts succeeds, return False to indicate failure
 
 def get_score_from_vina_logfile(logfile):
     with open(logfile, 'r') as f:
