@@ -7,6 +7,7 @@ import json
 import requests
 from datetime import date
 from functools import partial
+import math
 
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
@@ -76,8 +77,8 @@ def robustify(function):
     - Only if the input is valid, and the function completes successfully, return the function's result.
     """
     def function_wrapper(x):
-        if x is None:
-            return None
+        if x is None or math.isnan(x):
+            return x
         else:
             try:
                 result = function(x)
@@ -205,7 +206,7 @@ def get_score_from_vina_logfile(logfile):
 
 def get_pubchem_date(cid):
     """Get the creation date of a compound in PubChem from the compound id (cid)"""
-    cid = str(cid)
+    cid = str(int(cid))
     rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
     resp = requests.get(rest_request).json()
     if 'Fault' in resp.keys():
