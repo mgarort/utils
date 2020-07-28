@@ -63,6 +63,7 @@ def mol2morganfp(mol, nBits=1024, radius=3, return_bit_info=False):
     fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius=radius, nBits=nBits, bitInfo=bit_info)
     fp_array = np.zeros((1,))
     DataStructs.ConvertToNumpyArray(fp, fp_array)
+    fp_array = fp_array.reshape(1,-1).astype(int)
     if return_bit_info:
         return fp_array, bit_info
     else:
@@ -132,6 +133,7 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column,keep
                                'canonsmiles': partial(Chem.MolToSmiles, canonical=True),
                                'inchi': Chem.inchi.MolToInchi,
                                'inchikey': Chem.inchi.MolToInchiKey,
+                               'morgan4fp': partial(mol2morganfp, radius=4),
                                'morgan3fp': partial(mol2morganfp, radius=3),
                                'morgan2fp': partial(mol2morganfp, radius=2),
                               }
@@ -215,3 +217,10 @@ def get_pubchem_date(cid):
     else:
         creation_date = resp['InformationList']['Information'][0]['CreationDate']
         return date(year=creation_date['Year'],month=creation_date['Month'],day=creation_date['Day'])
+
+def strlist2floatlist(strlist):
+    """Function that converts a string representing a list of numbers to a list of floats.
+     This is useful because sometimes pandas will save a column with strings of floats as strings."""
+    strlist = strlist.strip('[').strip(']').split(',')
+    floatlist = [float(elem) for elem in strlist]
+    return floatlist
