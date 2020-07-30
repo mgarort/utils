@@ -9,6 +9,10 @@ from datetime import date
 from functools import partial
 import math
 
+# This file will be split into different files with theme-related utils (like chemistry, machine learning, plotting...). Until then, we will just have comments separating the sections
+
+
+##### ML utils #####
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
 
@@ -48,6 +52,9 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
 
     return train, val, test
 
+
+##### Chem related utils #####
+
 def smile2canonsmile(smile):
     try:
         mol = Chem.MolFromSmiles(smile)
@@ -70,7 +77,7 @@ def mol2morganfp(mol, nBits=1024, radius=3, return_bit_info=False):
         return fp_array
 
 
-def robustify(function):
+def robustify(function): # This is not used anymore!! Maybe delete
     """
     Function decorator that makes functions more robust and easier to integrate in pipelines, by adding the following rules:
     - If the input to the function is None, do not execute. Instead, return None.
@@ -150,6 +157,14 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column,keep
     return df_tmp
 
 
+# The following functions are probably obsolete. You should use ConversionPipeline to create a multiconverter that:
+# 1. Is used in expand_chem_df
+# 2. Can be used outside too, in order to replace the following functions
+#
+# Also, note that smile2pdbfile could be made part of the multiconverter, and it could just return True or False and write the pdb file on the side
+#
+#### FROM HERE
+
 def smile2inchi(smile):
     mol = Chem.MolFromSmiles(smile)
     inchi = Chem.inchi.MolToInchi(mol)
@@ -192,6 +207,8 @@ def smile2pdbfile(smile,filename,keep_hydrogens=True,random_seed=2342,n_attempts
     success_creating_pdb = False
     return success_creating_pdb  # If none of the n_attempts succeeds, return False to indicate failure
 
+#### UP TO HERE
+
 def get_score_from_vina_logfile(logfile):
     with open(logfile, 'r') as f:
         counter_to_score = None
@@ -225,3 +242,13 @@ def strlist2floatlist(strlist):
     strlist = strlist.strip('[').strip(']').split(',')
     floatlist = [float(elem) for elem in strlist]
     return floatlist
+
+def extract_best_pose(input_pdbqt, output_pdbqt):
+    """ Given an input pdbqt file with several poses from an Autodock Vina run, copy the first one 
+    in the file (which has the highest associated score) to a new, output pdbqt file """
+    with open(input_pdbqt, 'r') as input_handle, open(output_pdbqt, 'w') as output_handle:
+        for line in input_handle:
+            output_handle.write(line)
+            if line == 'ENDMDL\n':
+                break
+
