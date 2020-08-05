@@ -209,6 +209,7 @@ def smile2pdbfile(smile,filename,keep_hydrogens=True,random_seed=2342,n_attempts
 
 #### UP TO HERE
 
+
 def get_score_from_vina_logfile(logfile):
     with open(logfile, 'r') as f:
         counter_to_score = None
@@ -224,6 +225,7 @@ def get_score_from_vina_logfile(logfile):
         score = line_with_score.split()[1]
         return score
 
+
 def get_pubchem_date(cid):
     """Get the creation date of a compound in PubChem from the compound id (cid)"""
     cid = str(int(cid))
@@ -236,12 +238,14 @@ def get_pubchem_date(cid):
         creation_date = resp['InformationList']['Information'][0]['CreationDate']
         return date(year=creation_date['Year'],month=creation_date['Month'],day=creation_date['Day'])
 
+
 def strlist2floatlist(strlist):
     """Function that converts a string representing a list of numbers to a list of floats.
      This is useful because sometimes pandas will save a column with strings of floats as strings."""
     strlist = strlist.strip('[').strip(']').split(',')
     floatlist = [float(elem) for elem in strlist]
     return floatlist
+
 
 def extract_best_pose(input_pdbqt, output_pdbqt):
     """ Given an input pdbqt file with several poses from an Autodock Vina run, copy the first one 
@@ -251,4 +255,33 @@ def extract_best_pose(input_pdbqt, output_pdbqt):
             output_handle.write(line)
             if line == 'ENDMDL\n':
                 break
+
+
+def get_max_min_coord(input_pdb):
+    """Given an input pdb file with a ligand pose, this funtion examines the coordinates and returns a dictionary with the maximum and minimum
+    x, y and z coordinates
+
+    :input_pdb: filename of input pdb
+    :returns: dictionary with keys max_x, min_x, max_y, min_y, max_z, min_z
+    """
+    # Get atomic coordinates from PDB file
+    mol = Chem.MolFromPDBFile(input_pdb)
+    conformer = mol.GetConformers()[0] # A PDB file probably gives rise to a single conformer, but in any case we're using only the first one
+    pos = conformer.GetPositions()
+    atomic_numbers = []
+    for atom in mol.GetAtoms():
+        atomic_numbers.append(atom.GetAtomicNum())
+    # Save the coordinates in the dictionary max_min_coord
+    df_pos = pd.DataFrame(pos, columns=['x','y','z'])
+    df_pos['atomic_number'] = atomic_numbers
+    max_min_coord = {}
+    max_min_coord['max_x'] = df_pos['x'].max()
+    max_min_coord['min_x'] = df_pos['x'].min()
+    max_min_coord['max_y'] = df_pos['y'].max()
+    max_min_coord['min_y'] = df_pos['y'].min()
+    max_min_coord['max_z'] = df_pos['z'].max()
+    max_min_coord['min_z'] = df_pos['z'].min()
+    
+    return max_min_coord
+
 
