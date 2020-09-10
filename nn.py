@@ -1,3 +1,5 @@
+# This module will contain utilities related to neural networks
+
 import numpy as np
 
 

@@ -1,3 +1,5 @@
+# This module will contain utilities related to the practice of data science in general, like cleaning up a dataset, converting between formats, splitting datasets, etc
+
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -9,10 +11,8 @@ from datetime import date
 from functools import partial
 import math
 
-# This file will be split into different files with theme-related utils (like chemistry, machine learning, plotting...). Until then, we will just have comments separating the sections
 
 
-##### ML utils #####
 
 def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filename_root=None):
 
@@ -53,65 +53,7 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
     return train, val, test
 
 
-##### Chem related utils #####
 
-
-
-def robustify(function): # This is not used anymore!! Maybe delete
-    """
-    Function decorator that makes functions more robust and easier to integrate in pipelines, by adding the following rules:
-    - If the input to the function is None, do not execute. Instead, return None.
-    - If the function throws an error, do not stop execution. Instead, return None.
-    - Only if the input is valid, and the function completes successfully, return the function's result.
-    """
-    def function_wrapper(x):
-        if x is None or math.isnan(x):
-            return x
-        else:
-            try:
-                result = function(x)
-                return result
-            except Exception as e:
-                print(e)
-                return None
-    return function_wrapper
-
-
-
-
-# The following functions are probably obsolete. You should use ConversionPipeline to create a multiconverter that:
-# 1. Is used in expand_chem_df
-# 2. Can be used outside too, in order to replace the following functions
-#
-# Also, note that smile2pdbfile could be made part of the multiconverter, and it could just return True or False and write the pdb file on the side
-#
-#### FROM HERE
-
-def smile2inchi(smile):
-    mol = Chem.MolFromSmiles(smile)
-    inchi = Chem.inchi.MolToInchi(mol)
-    return inchi
-
-def smile2inchikey(smile):
-    mol = Chem.MolFromSmiles(smile)
-    inchikey = Chem.inchi.MolToInchiKey(mol)
-    return inchikey
-
-def inchi2canonsmile(inchi):
-    mol = Chem.inchi.MolFromInchi(inchi)
-    smile = Chem.MolToSmiles(mol,canonical=True)
-    return smile
-
-def smile2fp(smile,nBits=1024):
-    mol = Chem.MolFromSmiles(smile)
-    bitInfo={}
-    fp = AllChem.GetMorganFingerprintAsBitVect(mol, 3, bitInfo=bitInfo)
-    arr = np.zeros((1,))
-    DataStructs.ConvertToNumpyArray(fp, arr)
-    return arr, bitInfo
-
-
-#### UP TO HERE
 
 
 
