@@ -10,7 +10,7 @@ import requests
 from datetime import date
 from functools import partial
 import math
-
+import h5py
 
 
 
@@ -65,8 +65,49 @@ def strlist2floatlist(strlist):
     floatlist = [float(elem) for elem in strlist]
     return floatlist
 
+def is_hdf5_group(hdf5_elem):
+    """ Given a HDF5 elem for a group or dataset, this function returns True if the elem refers to a group."""
+    return isinstance(hdf5_elem, h5py.Group)
 
 
+def is_hdf5_dataset(hdf5_elem):
+    """ Given a HDF5 elem for a group or dataset, this function returns True if the elem refers to a dataset."""
+    return isinstance(hdf5_elem, h5py.Dataset)
+
+
+def hdf2dirs(hdf5_file, root_dir):
+    """Function that creates a hierarchy of directories that copies a HDF5 file. HDF5 groups are made into directories, 
+    and HDF5 datasets.
+    - hdf5_file: path to the HDF5 file
+    - root_dir: directory where we want to convert the HDF5 into diretories. Corresponds to the group '/' in the HDF5 file."""
+
+    def group2dirs(group):
+        pass
+        # Create directory for group
+
+        # cd into that directory
+        
+        # For every dataset within the group: save the dataset as a numpy array/pickle/other format of your choice
+
+        # For every group within the group: apply group2dirs to them
+        
+        # cd ..
+
+    with h5py.File(hdf5_file,'r') as hf:
+        for key1 in hf.keys():
+            print(key1)
+            elem1 = hf[key1]
+            print('is_group', is_hdf5_group(elem1))
+            print('is_general_group', is_hdf5_general_group(elem1))
+            print('is_dataset', is_hdf5_dataset(elem1))
+            for key2 in elem1.keys():
+                print(key2)
+                elem2 = elem1[key2]
+                print('is_group', is_hdf5_group(elem2))
+                print('is_general_group', is_hdf5_general_group(elem2))
+                print('is_dataset', is_hdf5_dataset(elem2))
+
+            break
 
 
 
