@@ -99,7 +99,7 @@ def hdf2dirs(hdf5_file, root_dir):
             elif is_hdf5_dataset(elem):
                 array = elem[...]
                 array_path = elem_path + '.npy'
-                np.save(array_path, array)
+                np.save(array_path, array,allow_pickle=False)
         # cd ..
         os.chdir('..')
 
