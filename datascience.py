@@ -91,7 +91,7 @@ def hdf2dirs(hdf5_file, root_dir):
         # Convert to directorie and files
         for key in group.keys():
             elem = group[key]
-            elem_path = group_dir + '/' + key
+            elem_path = os.path.join(group_dir, key)
             # For every group within the group: apply group2dirs to them
             if is_hdf5_group(elem):
                 group2dirs(elem, elem_path)
