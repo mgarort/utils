@@ -11,6 +11,7 @@ from datetime import date
 from functools import partial
 import math
 import h5py
+import os
 
 
 
@@ -81,33 +82,29 @@ def hdf2dirs(hdf5_file, root_dir):
     - hdf5_file: path to the HDF5 file
     - root_dir: directory where we want to convert the HDF5 into diretories. Corresponds to the group '/' in the HDF5 file."""
 
-    def group2dirs(group):
-        pass
-        # Create directory for group
-
+    def group2dirs(group,group_dir):
+        # Create directory for group 
+        if not os.path.exists(group_dir):
+            os.makedirs(group_dir)
         # cd into that directory
-        
-        # For every dataset within the group: save the dataset as a numpy array/pickle/other format of your choice
-
-        # For every group within the group: apply group2dirs to them
-        
+        os.chdir(group_dir)
+        # Convert to directorie and files
+        for key in group.keys():
+            elem = group[key]
+            elem_path = group_dir + '/' + key
+            print('processing', elem_path)
+            # For every group within the group: apply group2dirs to them
+            if is_hdf5_group(elem):
+                group2dirs(elem, elem_path)
+            # For every dataset within the group: save the dataset as a numpy array/pickle/other format of your choice
+            elif is_hdf5_dataset(elem):
+                array = elem[...]
+                array_path = elem_path + '.npy'
+                np.save(array_path, array)
         # cd ..
+        os.chdir('..')
 
     with h5py.File(hdf5_file,'r') as hf:
-        for key1 in hf.keys():
-            print(key1)
-            elem1 = hf[key1]
-            print('is_group', is_hdf5_group(elem1))
-            print('is_general_group', is_hdf5_general_group(elem1))
-            print('is_dataset', is_hdf5_dataset(elem1))
-            for key2 in elem1.keys():
-                print(key2)
-                elem2 = elem1[key2]
-                print('is_group', is_hdf5_group(elem2))
-                print('is_general_group', is_hdf5_general_group(elem2))
-                print('is_dataset', is_hdf5_dataset(elem2))
-
-            break
-
+        group2dirs(hf,root_dir)
 
 
