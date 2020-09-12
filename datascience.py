@@ -92,7 +92,6 @@ def hdf2dirs(hdf5_file, root_dir):
         for key in group.keys():
             elem = group[key]
             elem_path = group_dir + '/' + key
-            print('processing', elem_path)
             # For every group within the group: apply group2dirs to them
             if is_hdf5_group(elem):
                 group2dirs(elem, elem_path)
@@ -104,7 +103,8 @@ def hdf2dirs(hdf5_file, root_dir):
         # cd ..
         os.chdir('..')
 
-    with h5py.File(hdf5_file,'r') as hf:
+    with h5py.File(hdf5_file,'r') as hf: # TODO Maybe extract the iteration over the keys at the first level, and add a progress 
+                                         #      bar over those to see progress while the file is processed
         group2dirs(hf,root_dir)
 
 
