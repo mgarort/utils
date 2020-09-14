@@ -2,6 +2,8 @@
 
 import numpy as np
 from collections.abc import Iterable
+import torch
+import torch.nn as nn
 
 
 def compute_dims_after_conv3d(x, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
@@ -71,3 +73,38 @@ def compute_dims_after_maxpool3d(x, kernel_size, stride=None, padding=0, dilatio
     d_out, h_out, w_out = round_mode( (np.array([d_in, h_in, w_in]) + 2*padding - dilation*(kernel_size-1) - 1) /stride + 1)
 
     return (int(n_out), int(c_out), int(d_out), int(h_out), int(w_out))
+
+
+class View(nn.Module):
+    '''This class is implemented so that we can use torch.Tensor.view as a layer in a network. This allows us to 
+    unroll the output of convolutional/pooling layers so that they can be fed into a torch.nn.Linear layer. 
+    Implementing it as a layer rather than a function allows us to initialize the architecture automatically from a list
+    of layer specifications, rather than manually write out all the convolutional/pooling layers, then torch.Tensor.view,
+    and then all the linear layers.'''
+
+    def __init__(self,out_features):
+        super(View, self).__init__()
+        self.out_features = out_features
+
+    def forward(self,x):
+        return x.view(-1,self.out_features)
+
+
+class LinearActivated(nn.Module):
+    '''This class is implemented so that we can make the activation part of the layer, and not a function. This will make it
+    easier to initiaize the architecture automatically from a list of layer specifications, rather than manually writing out
+    the architecture, including the F.relu(...)
+    - activation: must be an activation functional, like nn.functional.relu
+    - in_features and out_feature: parameters for nn.Linear
+    '''
+
+    def __init__(self,activation,in_features,out_features):
+        super(LinearActivated, self).__init__()
+        self.activation = activation
+        self.linear = nn.Linear(in_features=in_features,out_features=out_features)
+
+    def forward(self,x):
+        return self.activation(self.linear(x))
+
+    
+
