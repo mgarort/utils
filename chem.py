@@ -1,6 +1,7 @@
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
+from functools import partial
 
 
 def get_max_min_coord(input_pdb):
