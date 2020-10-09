@@ -10,3 +10,4 @@ lines.markersize : 6
 legend.fontsize: 13
 mathtext.fontset: stix
 font.family: STIXGeneral
+grid.linestyle: :
