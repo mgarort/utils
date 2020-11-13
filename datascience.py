@@ -12,6 +12,7 @@ from functools import partial
 import math
 import h5py
 import os
+import sqlite3
 
 
 
@@ -106,5 +107,137 @@ def hdf2dirs(hdf5_file, root_dir):
     with h5py.File(hdf5_file,'r') as hf: # TODO Maybe extract the iteration over the keys at the first level, and add a progress 
                                          #      bar over those to see progress while the file is processed
         group2dirs(hf,root_dir)
+
+
+class SQLFrameLoc():
+    '''
+    This class is a helper class so that SQL dataframes can do row indexing with .loc[...]
+    '''
+
+    def __init__(self):
+
+
+    def __getitem__(self,key):
+        
+def sql_connection(path):
+   '''
+   Connect to sqlite3 database and return connection, unless sqlite3 error.
+   '''
+    try:
+        connection = sqlite3.connect(path)
+        return connection
+    except sqlite3.Error as e:
+        print(e)
+
+
+class SQLFrame():
+    '''
+    This class implements a SQLite table (i.e. a database with a single table) with simple operations to insert new data, look up data, and delete
+    data, either in the form of columns and rows. Columns can be accessed with square brackets, just like pandas dataframes.
+    '''
+
+    # NOTE A SQLFrame is a sqlite3 database with a single table. The name of the table can always be the same, and it can be "table"
+    # NOTE Commiting is to be done manually, not within the exit function
+
+    def __init__(self,path,columns,types,_create_from_scratch=True):
+        '''
+        If path is given, then init loads the database in the path. Otherwise, it creates a new database.
+        - path: path for the database to be created
+        - index: index for the database to be created???? XXX Not sure if a good idea because maybe a database should be created one by one
+        - columns: list with columns of the database to be created.
+        - types: dict with the types of the columns that will be used (necessary for adapters and converters, which will be useful for arrays).
+                 The keys are the column names, and the values are the types
+        - _create_from_scratch: private argument, do not use! (this simply allows a cleaner interface, so that creating sqlframes is done through
+                    SQLFrame, and connecting to existing sqlframes is done through function connect_sqlframe)
+        '''
+        self.path = path
+        self.columns = columns
+        self.types = types
+        # Raise error if we're trying to create a new database from scratch but it already exists
+        # (if the database already exists, we should connect to it rather than recreate it)
+        if _create_from_scratch and os.path.isfile(path) :
+            raise RuntimeError('File already exists in that location.')
+        # Create the main table
+        connection = sql_connection(self.path)
+        cursor = connection.cursor()
+        cursor.execute(self.create_table_statement)
+        # TODO Create the table somewhere, probably in init
+        #cursor.execute("CREATE TABLE table(id integer PRIMARY KEY, name text, salary real, department text, position text, hireDate text)")
+
+    @property
+    def connection(self):
+        '''
+        Returns a connection to the database. Implemented as a property method rather than as an attribute in __init__
+        because for concurrency each thread must open its own connection  
+        https://stackoverflow.com/questions/49918421/sqlite-concurrent-read-sqlite3-get-table
+        '''
+        return sql_connection(self.path)
+
+    def create_table_statement(self):
+        '''
+        Composes statement to create table, of the form
+        'CREATE TABLE table ( index type PRIMARY_KEY, column type, ... , column type, )'
+        '''
+        index_name = columns[0]
+        columns_names = columns[1:]
+        # Start statement
+        statement = 'CREATE TABLE table ( '
+        # Add index
+        statement += index_name + ' ' + self.types + 'PRIMARY_KEY, ' # 'index type PRIMARY_KEY, '
+        # Add columns
+        for each_column_name in columns_names:
+            statement += each_column_name + ' ' + types[each_column_name] + ', ' # 'column type, '
+        # Finish statement
+        statement += ' )'
+        return statement
+
+    # TODO To be used by append_inplace
+    def insert_rows_statement(self):
+        pass
+
+    # TODO To be used by sqlframe.loc[]  -->  .loc.__getitem__
+    def select_rows_statement(self):
+        pass
+
+    # TODO To be used by sqlframe[]  -->  __getitem__
+    def select_columns_statement(self):
+        pass
+
+    # TODO
+    def append_inplace(self,):
+        '''
+        Inserts rows at the end of the table. Called append because it is similar to pandas.DataFrame.append, and inplace because
+        in contrast to pandas append, this one is inplace.
+        '''
+        connection = self.connection
+        cursor = connection.cursor()
+        pass
+
+    def __getitem__(self,key):
+        '''
+        '''
+        pass
+
+    class loc
+
+    # __enter__ and __exit__ are defined so that the database can be used within with statements,
+    # and the connection is always closed upon exit
+    def __enter__(self):
+        return self
+    def __exit__(self):
+        self.connection.close()
+
+
+def create_SQLFrame(path):
+    '''
+    This function creates a new SQLFrame on the location path, and returns it.
+    '''
+    # Check if file exists and complain if so
+    if os.path.isfile(path):
+        raise RuntimeError('File already exists in that location.')
+    else:
+        sqlframe = SQLFrame(path)
+
+
 
 
