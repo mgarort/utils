@@ -2,11 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem import AllChem
-from rdkit.Chem import DataStructs
 import json
-import requests
 from datetime import date
 from functools import partial
 import math
@@ -115,14 +111,16 @@ class SQLFrameLoc():
     '''
 
     def __init__(self):
+        pass
 
 
     def __getitem__(self,key):
+        pass
         
 def sql_connection(path):
-   '''
-   Connect to sqlite3 database and return connection, unless sqlite3 error.
-   '''
+    '''
+    Connect to sqlite3 database and return connection, unless sqlite3 error.
+    '''
     try:
         connection = sqlite3.connect(path)
         return connection
@@ -160,7 +158,9 @@ class SQLFrame():
         # Create the main table
         connection = sql_connection(self.path)
         cursor = connection.cursor()
-        cursor.execute(self.create_table_statement)
+        statement = self.create_table_statement()
+        print(statement)
+        cursor.execute(self.create_table_statement())
         # TODO Create the table somewhere, probably in init
         #cursor.execute("CREATE TABLE table(id integer PRIMARY KEY, name text, salary real, department text, position text, hireDate text)")
 
@@ -173,27 +173,52 @@ class SQLFrame():
         '''
         return sql_connection(self.path)
 
+    @property
+    def cursor(self):
+        '''
+        Returns a cursor to the database. Useful because most operations are done through the cursor directly, and the connection
+        is not used.
+        '''
+        return self.connection.cursor()
+
     def create_table_statement(self):
         '''
         Composes statement to create table, of the form
-        'CREATE TABLE table ( index type PRIMARY_KEY, column type, ... , column type, )'
+        'CREATE TABLE my_table ( index type PRIMARY KEY, column type, ... , column type, );'
         '''
-        index_name = columns[0]
-        columns_names = columns[1:]
-        # Start statement
-        statement = 'CREATE TABLE table ( '
+        index_name = self.columns[0]
+        columns_names = self.columns[1:]
+        # Start statement ("my_table" is an arbitrary name. Note that "table" cannot be used because it's a reserved word)
+        statement = 'CREATE TABLE my_table ( '
         # Add index
-        statement += index_name + ' ' + self.types + 'PRIMARY_KEY, ' # 'index type PRIMARY_KEY, '
+        statement += index_name + ' ' + self.types[index_name] + ' PRIMARY KEY' # 'index type PRIMARY_KEY, '
         # Add columns
         for each_column_name in columns_names:
-            statement += each_column_name + ' ' + types[each_column_name] + ', ' # 'column type, '
+            statement += ', ' + each_column_name + ' ' + self.types[each_column_name] # ', column type'
         # Finish statement
-        statement += ' )'
+        statement += ' );'
         return statement
 
     # TODO To be used by append_inplace
+    # TODO Extend it to compose a statement for multiple rows
     def insert_rows_statement(self):
-        pass
+        '''
+        Composes statement to insert a single row, of the form
+        'INSERT INTO my_table ( column_1, ... , column_2 ) VALUES ( ?, ..., ? );'
+        '''
+        # Start statement
+        statement = 'INSERT INTO my_table ( '
+        # Add column names (including index, which is the first column)
+        statement += ', '.join(self.columns)
+        # Continue statement
+        statement += ' ) VALUES ( '
+        # Add the interrogation signs
+        n_cols = len(self.columns)
+        statement += ', '.join(['?']*n_cols) # '?, ?, ... , ?'
+        # Finish statement
+        statement += ' );'
+        return statement
+        
 
     # TODO To be used by sqlframe.loc[]  -->  .loc.__getitem__
     def select_rows_statement(self):
@@ -203,28 +228,27 @@ class SQLFrame():
     def select_columns_statement(self):
         pass
 
-    # TODO
-    def append_inplace(self,):
+
+    # TODO Extend so that it works with more than a single row
+    def append_inplace(self,row):
         '''
         Inserts rows at the end of the table. Called append because it is similar to pandas.DataFrame.append, and inplace because
         in contrast to pandas append, this one is inplace.
+        - row: dictionary with column names as keys, and row values as values
         '''
-        connection = self.connection
-        cursor = connection.cursor()
-        pass
+        cursor = self.cursor
+        statement = self.insert_rows_statement()
+        values = tuple(row[column] for column in self.columns)
+        cursor.execute(statement, values)
 
     def __getitem__(self,key):
-        '''
-        '''
         pass
-
-    class loc
 
     # __enter__ and __exit__ are defined so that the database can be used within with statements,
     # and the connection is always closed upon exit
     def __enter__(self):
         return self
-    def __exit__(self):
+    def __exit__(self, exec_type, exec_value, exec_traceback):
         self.connection.close()
 
 
