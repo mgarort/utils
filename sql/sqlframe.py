@@ -72,10 +72,8 @@ class SQLFrame():
         connection = sql_connection(self.path)
         cursor = connection.cursor()
         statement = create_table_statement(self.columns,self.types)
-        print(statement)
         cursor.execute(statement)
-        # TODO Create the table somewhere, probably in init
-        #cursor.execute("CREATE TABLE table(id integer PRIMARY KEY, name text, salary real, department text, position text, hireDate text)")
+        connection.commit()
 
     @property
     def connection(self):
@@ -95,21 +93,23 @@ class SQLFrame():
         return self.connection.cursor()
 
     @property
-    def n_rows(self):
+    def _n_rows(self):
         cursor = self.cursor
         cursor.execute('SELECT count(*) from my_table;')
         n_rows = cursor.fetchone()[0]
         return n_rows
     @property
-    def n_cols(self):
+    def _n_cols(self):
         cursor = self.cursor
-        #cursor.execute('SELECT count(*) FROM information_schema.columns WHERE table_name = my_table')
-        cursor.execute('SELECT count(*) from pragma_table_info( my_table ) ;')
-        n_cols = cursor.fetchone[0]
+        cursor.execute("SELECT count(*) FROM pragma_table_info( 'my_table' ) ;")
+        n_cols = cursor.fetchone()[0]
         return n_cols
     @property
     def shape(self):
-        return (self.n_rows, self.n_cols)
+        '''
+        Returns a tuple with the number of rows and the number of columns, as in numpy and pandas
+        '''
+        return (self._n_rows, self._n_cols)
 
 
     # TODO Improve the formatting of the returned tables (right now it's a tuple within a list or something like that...)
