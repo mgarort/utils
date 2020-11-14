@@ -94,6 +94,36 @@ class SQLFrame():
         '''
         return self.connection.cursor()
 
+    @property
+    def n_rows(self):
+        cursor = self.cursor
+        cursor.execute('SELECT count(*) from my_table;')
+        n_rows = cursor.fetchone()[0]
+        return n_rows
+    @property
+    def n_cols(self):
+        cursor = self.cursor
+        #cursor.execute('SELECT count(*) FROM information_schema.columns WHERE table_name = my_table')
+        cursor.execute('SELECT count(*) from pragma_table_info( my_table ) ;')
+        n_cols = cursor.fetchone[0]
+        return n_cols
+    @property
+    def shape(self):
+        return (self.n_rows, self.n_cols)
+
+
+    # TODO Improve the formatting of the returned tables (right now it's a tuple within a list or something like that...)
+    @property
+    def tables(self):
+        cursor = self.cursor
+        statement = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        cursor.execute(statement)
+        return cursor.fetchall()
+
+
+
+
+
 
 
     # TODO Extend so that it works with more than a single row
@@ -103,10 +133,13 @@ class SQLFrame():
         in contrast to pandas append, this one is inplace.
         - row: dictionary with column names as keys, and row values as values
         '''
-        cursor = self.cursor
+        connection = self.connection
+        cursor = connection.cursor()
         statement = insert_rows_statement(self.columns)
         values = tuple(row[column] for column in self.columns)
         cursor.execute(statement, values)
+        connection.commit()
+
 
     def __getitem__(self,key):
         pass
