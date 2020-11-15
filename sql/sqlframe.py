@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import pandas as pd
 
 from utils.sql.statements import *
 
@@ -17,12 +18,27 @@ class SQLFrameLoc():
         - rows: single row name, or list with row names
         - columns:  single column name, or list with column names
         '''
+        # Format the rows and cols selected. If single rows or cols are selected,
+        # make them lists so that the compose statement function can deal with them
         rows_selected = rows_and_cols[0]
+        if not isinstance(rows_selected,list): 
+            rows_selected = [rows_selected]
         cols_selected = rows_and_cols[1]
-        cursor = self.sqlframe.cursor
+        if not isinstance(cols_selected,list): 
+            cols_selected = [cols_selected]
+        # Execute selection
+        connection = self.sqlframe.connection
+        cursor = connection.cursor()
         statement = compose_statement_select_rows_by_id(rows_selected,cols_selected,self.sqlframe.index_name)
         cursor.execute(statement)
-        return cursor.fetchall()
+        selection = cursor.fetchall()
+        connection.close()
+        # Convert list of tuples to list of lists, and add the row indices
+        selection = [ [idx] +list(row) for idx,row in zip(rows_selected,selection)]
+        # Return a dataframe rather than a list
+        df = pd.DataFrame(selection, columns = [self.sqlframe.index_name]+cols_selected ).set_index(self.sqlframe.index_name)
+        # TODO If returning a single column or a single row, check if it is better to return a pandas.Series
+        return df
         
 
 
@@ -40,16 +56,6 @@ class SQLFrameIloc():
 
 
         
-def sql_connection(path):
-    '''
-    Connect to sqlite3 database and return connection, unless sqlite3 error.
-    '''
-    try:
-        connection = sqlite3.connect(path)
-        return connection
-    except sqlite3.Error as e:
-        print(e)
-
 
 class SQLFrame():
     '''
@@ -74,7 +80,7 @@ class SQLFrame():
         self.path = path
         self.columns = columns
         self.index_name = columns[0] # TODO Change this so that it is a bit more sophisticated than just the first column...
-        self.types = types
+        self.types = types # TODO Change so that type are determined automatically, rather than passed manually through a dictionary
         self.iloc = SQLFrameIloc(self)
         self.loc = SQLFrameLoc(self)
         # Raise error if we're trying to create a new database from scratch but it already exists
@@ -82,23 +88,29 @@ class SQLFrame():
         if _create_from_scratch and os.path.isfile(path) :
             raise RuntimeError('File already exists in that location.')
         # Create the main table
-        connection = sql_connection(self.path)
+        connection = self.connection
         cursor = connection.cursor()
-        statement = create_table_statement(self.columns,self.types)
+        statement = compose_statement_create_table(self.columns,self.types)
         cursor.execute(statement)
         connection.commit()
+        connection.close()
 
     @property
     def connection(self):
         '''
-        Returns a connection to the database. Implemented as a property method rather than as an attribute in __init__
+        Returns a connection to the database, except SQLite error. Implemented as a property method rather than as an attribute in __init__
         because for concurrency each thread must open its own connection  
         https://stackoverflow.com/questions/49918421/sqlite-concurrent-read-sqlite3-get-table
         '''
-        return sql_connection(self.path)
-
+        try:
+            connection = sqlite3.connect(self.path)
+            return connection
+        except sqlite3.Error as e:
+            print(e)
     @property
     def cursor(self):
+        # TODO Check if this method is really necessary, since we need the connection itself for most actions because we need to
+        # close the connection after each action
         '''
         Returns a cursor to the database. Useful because most operations are done through the cursor directly, and the connection
         is not used.
@@ -133,13 +145,9 @@ class SQLFrame():
         cursor.execute(statement)
         return cursor.fetchall()
 
-
-
-
-
-
-
     # TODO Extend so that it works with more than a single row
+    # TODO Insertions (and maybe updates?) should be made to temporary databases, so that we can choose when to save the changes manually
+    # with a method such as SQLFrame.save() or something
     def append_inplace(self,row):
         '''
         Inserts rows at the end of the table. Called append because it is similar to pandas.DataFrame.append, and inplace because
@@ -148,12 +156,13 @@ class SQLFrame():
         '''
         connection = self.connection
         cursor = connection.cursor()
-        statement = insert_rows_statement(self.columns)
+        statement = compose_statement_insert_rows(self.columns)
         values = tuple(row[column] for column in self.columns)
         cursor.execute(statement, values)
         connection.commit()
 
 
+    # TODO Implement selection of columns, as in pandas dataframe
     def __getitem__(self,key):
         pass
 
@@ -165,15 +174,6 @@ class SQLFrame():
         self.connection.close()
 
 
-def create_SQLFrame(path):
-    '''
-    This function creates a new SQLFrame on the location path, and returns it.
-    '''
-    # Check if file exists and complain if so
-    if os.path.isfile(path):
-        raise RuntimeError('File already exists in that location.')
-    else:
-        sqlframe = SQLFrame(path)
 
 
 
