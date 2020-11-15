@@ -1,4 +1,4 @@
-def create_table_statement(columns, types):
+def compose_statement_create_table(columns, types):
     '''
     Composes statement to create table, of the form
     'CREATE TABLE my_table ( index type PRIMARY KEY, column type, ... , column type, );'
@@ -11,7 +11,7 @@ def create_table_statement(columns, types):
     # Start statement ("my_table" is an arbitrary name. Note that "table" cannot be used because it's a reserved word)
     statement = 'CREATE TABLE my_table ( '
     # Add index
-    statement += index_name + ' ' + types[index_name] + ' PRIMARY KEY' # 'index type PRIMARY_KEY, '
+    statement += index_name + ' ' + types[index_name] #+ ' PRIMARY KEY' # 'index type PRIMARY_KEY, '
     # Add columns
     for each_column_name in column_names:
         statement += ', ' + each_column_name + ' ' + types[each_column_name] # ', column type'
@@ -21,7 +21,7 @@ def create_table_statement(columns, types):
 
 # TODO To be used by append_inplace
 # TODO Extend it to compose a statement for multiple rows
-def insert_rows_statement(columns):
+def compose_statement_insert_rows(columns):
     '''
     Composes statement to insert a single row, of the form
     'INSERT INTO my_table ( column_1, ... , column_2 ) VALUES ( ?, ..., ? );'
@@ -45,6 +45,27 @@ def insert_rows_statement(columns):
 def select_rows_statement(self):
     pass
 
-# TODO To be used by sqlframe[]  -->  __getitem__
-def select_columns_statement(self):
+# TODO To be used by sqlframe.iloc[]
+def select_row_number_statement(n_rows):
     pass
+
+# TODO To be used by sqlframe[]  -->  __getitem__
+def compose_statement_select_rows_by_id(rows_selected,cols_selected,index_name):
+    '''
+    Compose statement to select rows by index, of the form
+
+    'SELECT col_1, ... , col_m FROM my_table WHERE index_name IN ( row_1, ... , row_n );'
+
+    - rows_selected: list of strings, where each string is a row id
+    - cols_selected: list of strings, where each string is a col name
+    '''
+    statement = 'SELECT '
+    statement += ', '.join(cols_selected)
+    statement += ' FROM my_table WHERE '
+    statement += index_name
+    statement += ' IN ( '
+    rows_selected = ["'" + row + "'" for row in rows_selected]
+    statement += ', '.join(rows_selected)
+    statement += ' );'
+    return(statement) # TODO Improve the formatting/type of the return
+
