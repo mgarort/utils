@@ -7,13 +7,24 @@ class SQLFrameLoc():
     '''
     This class is a helper class so that SQL dataframes can do row indexing with .loc[...]
     '''
+    def __init__(self,sqlframe):
+        self.sqlframe = sqlframe
+    def __getitem__(self,rows_and_cols):
+        # TODO Allow indexing with lists of rows and columns, rather than single ones
+        '''
+        - key_list: list with keys. For example, could be ['Miguel','age'] to 
+                    show the cell in row "Miguel" and column "age"
+        - rows: single row name, or list with row names
+        - columns:  single column name, or list with column names
+        '''
+        rows_selected = rows_and_cols[0]
+        cols_selected = rows_and_cols[1]
+        cursor = self.sqlframe.cursor
+        statement = compose_statement_select_rows_by_id(rows_selected,cols_selected,self.sqlframe.index_name)
+        cursor.execute(statement)
+        return cursor.fetchall()
+        
 
-    def __init__(self):
-        pass
-
-
-    def __getitem__(self,key):
-        pass
 
 class SQLFrameIloc():
     def __init__(self,sqlframe):
@@ -62,8 +73,10 @@ class SQLFrame():
         '''
         self.path = path
         self.columns = columns
+        self.index_name = columns[0] # TODO Change this so that it is a bit more sophisticated than just the first column...
         self.types = types
         self.iloc = SQLFrameIloc(self)
+        self.loc = SQLFrameLoc(self)
         # Raise error if we're trying to create a new database from scratch but it already exists
         # (if the database already exists, we should connect to it rather than recreate it)
         if _create_from_scratch and os.path.isfile(path) :
