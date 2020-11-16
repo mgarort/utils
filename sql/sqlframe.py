@@ -190,8 +190,12 @@ class SQLFrame():
         connection.commit()
 
     # TODO Implement selection of columns, as in pandas dataframe
-    def __getitem__(self,key):
-        pass
+    def __getitem__(self,columns):
+        '''
+        This implements selection of columns with SQLFrame[...], as in pandas.DataFrame
+        '''
+        return self.loc[:,columns]
+
 
     def set_index(self,index_name):
         '''
