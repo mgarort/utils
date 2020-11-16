@@ -67,7 +67,6 @@ class SQLFrameLoc():
         # Indexing the dataframe created with the original selection allows our return type (single value, pd.Series
         # or pd.DataFrame) to be consistent with the return type of pandas.DataFrame
         return df.loc[idx_and_col_selected]
-        #return selection
         
 
 class SQLFrameIloc():
