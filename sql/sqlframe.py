@@ -17,7 +17,7 @@ class SQLFrameLoc():
     '''
     def __init__(self,sqlframe):
         self.sqlframe = sqlframe
-    def __getitem__(self,rows_and_cols):
+    def __getitem__(self,idx_and_col_selected):
         # TODO Allow indexing with lists of rows and columns, rather than single ones
         '''
         - key_list: list with keys. For example, could be ['Miguel','age'] to 
@@ -25,27 +25,54 @@ class SQLFrameLoc():
         - rows: single row name, or list with row names
         - columns:  single column name, or list with column names
         '''
-        # Format the rows and cols selected. If single rows or cols are selected,
-        # make them lists so that the compose statement function can deal with them
-        rows_selected = rows_and_cols[0]
-        if not isinstance(rows_selected,list): 
-            rows_selected = [rows_selected]
-        cols_selected = rows_and_cols[1]
-        if not isinstance(cols_selected,list): 
-            cols_selected = [cols_selected]
+        # Determine whether only row info, or also col info is given
+        is_there_col_info = isinstance(idx_and_col_selected,tuple)
+        idx_selected = idx_and_col_selected[0] if is_there_col_info else idx_and_col_selected
+        col_selected = idx_and_col_selected[1] if is_there_col_info else None
+        # Determine the return type according to the indices given to .loc[...].
+        # Frame formatting across the row or col dimensions is maintained if a list
+        # of rows or cols is given. If no col info is given, it is interpreted as
+        # selecting all cols, so col frame formatting is maintained.
+        # - loc[row, col] : return single value
+        # - loc[row] : return pd.Series
+        # - loc[[row]] : return pd.DataFrame
+        # - loc[[row],[col]] : return pd.DataFrame
+        should_keep_row_formatting = isinstance(idx_selected,list)
+        should_keep_col_formatting = isinstance(col_selected,list) or (col_selected is None)
+        # In Python, ":" indexing produces an object slice(None,None,None),
+        # and it stands for selecting all
+        if (isinstance(idx_selected,slice) and
+            idx_selected.start is None and
+            idx_selected.stop is None and
+            idx_selected.step is None):
+            idx_selected = None
+        if (isinstance(col_selected,slice) and
+            col_selected.start is None and
+            col_selected.stop is None and
+            col_selected.step is None):
+            col_selected = None
+        # Put selected rows (and cols, if any) into lists so that the function
+        # compose_statement_select_rows_by_id can deal with them homogenously
+        if (not isinstance(idx_selected,list)) and (idx_selected is not None):
+            idx_selected = [idx_selected]
+        if (not isinstance(col_selected,list)) and (col_selected is not None):
+            col_selected = [col_selected]
         # Execute selection
-        connection = self.sqlframe.connection
+        connection = self.sqlframe.get_connection()
         cursor = connection.cursor()
-        statement = compose_statement_select_rows_by_id(rows_selected,cols_selected,self.sqlframe._index_name)
+        statement = compose_statement_select_rows_by_id(idx_selected,col_selected,self.sqlframe._index_name)
         cursor.execute(statement)
         selection = cursor.fetchall()
         connection.close()
         # Convert list of tuples to list of lists, and add the row indices
-        selection = [ [idx] +list(row) for idx,row in zip(rows_selected,selection)]
-        # Return a dataframe rather than a list
-        df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+cols_selected ).set_index(self.sqlframe._index_name)
-        # TODO If returning a single column or a single row, check if it is better to return a pandas.Series
-        return df
+        if idx_selected is None:
+            idx_selected = self.sqlframe.index # TODO Implement SQLFrame.index method
+        selection = [ [idx_row] +list(selection_row) for idx_row,selection_row in zip(idx_selected,selection)]
+        ## Return a dataframe rather than a list
+        #df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+col_selected ).set_index(self.sqlframe._index_name)
+        ## TODO If returning a single column or a single row, check if it is better to return a pandas.Series
+        #return df
+        return selection
         
 
 class SQLFrameIloc():
@@ -92,7 +119,7 @@ class SQLFrame():
             if os.path.isfile(path):
                 raise RuntimeError('File already exists in that location.')
             # Create the main table
-            connection = self.connection
+            connection = self.get_connection()
             cursor = connection.cursor()
             statement = compose_statement_create_table(self.columns,self.types)
             cursor.execute(statement)
@@ -101,36 +128,40 @@ class SQLFrame():
 
     # TODO Make a property method that returns the columns, which is self.columns
 
-    @property
-    def connection(self):
+    # NOTE Not made a property method because a property method self.connection suggests that a connection is an attribute 
+    # that common to the entire class. However, this method creates a new connection, and self.get_connection() conveys that better
+    def get_connection(self):
         '''
         Returns a connection to the database, except SQLite error. Implemented as a property method rather than as an attribute in __init__
         because for concurrency each thread must open its own connection  
         https://stackoverflow.com/questions/49918421/sqlite-concurrent-read-sqlite3-get-table
         '''
         return get_sqlite_connection(self.path)
-    @property
-    def cursor(self):
+    def get_cursor(self):
         # TODO Check if this method is really necessary, since we need the connection itself for most actions because we need to
         # close the connection after each action
         '''
         Returns a cursor to the database. Useful because most operations are done through the cursor directly, and the connection
         is not used.
         '''
-        return self.connection.cursor()
+        return self.get_connection().cursor()
 
     @property
     def _n_rows(self):
-        cursor = self.cursor
+        connection = self.get_connection()
+        cursor = connection.cursor()
         cursor.execute('SELECT count(*) from my_table;')
         n_rows = cursor.fetchone()[0]
+        connection.close()
         return n_rows
     # TODO Maybe change to simply counting self.columns? And self.columns could be a property method that returns the columns
     @property
     def _n_cols(self):
-        cursor = self.cursor
+        connection = self.get_connection()
+        cursor = connection.cursor()
         cursor.execute("SELECT count(*) FROM pragma_table_info( 'my_table' ) ;")
         n_cols = cursor.fetchone()[0]
+        connection.close()
         return n_cols
     @property
     def shape(self):
@@ -143,10 +174,13 @@ class SQLFrame():
     # TODO Improve the formatting of the returned tables (right now it's a tuple within a list or something like that...)
     @property
     def tables(self):
-        cursor = self.cursor
+        connection = self.get_connection()
+        cursor = connection.cursor()
         statement = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
         cursor.execute(statement)
-        return cursor.fetchall()
+        selection = cursor.fetchall()
+        connection.close()
+        return selection
 
     # TODO Extend so that it works with more than a single row
     # TODO Extend/improve so that we append pandas dataframes and dataseries rather/in addition to dictionaries
@@ -158,7 +192,7 @@ class SQLFrame():
         in contrast to pandas append, this one is inplace.
         - row: dictionary with column names as keys, and row values as values
         '''
-        connection = self.connection
+        connection = self.get_connection()
         cursor = connection.cursor()
         statement = compose_statement_insert_rows(self.columns)
         values = tuple(row[column] for column in self.columns)
@@ -175,6 +209,19 @@ class SQLFrame():
         as pandas.DataFrame.set_index does
         '''
         self._index_name = index_name
+
+    @property
+    def index(self):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        statement = 'SELECT ' + self._index_name + ' FROM my_table;'
+        cursor.execute(statement)
+        index = cursor.fetchall()
+        connection.close()
+        index = [idx[0] for idx in index]
+        return index
+
+        
 
 
 def read_sqlframe(path,index):

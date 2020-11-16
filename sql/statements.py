@@ -50,22 +50,32 @@ def select_row_number_statement(n_rows):
     pass
 
 # TODO To be used by sqlframe[]  -->  __getitem__
-def compose_statement_select_rows_by_id(rows_selected,cols_selected,index_name):
+def compose_statement_select_rows_by_id(idx_selected,col_selected,index_name):
     '''
-    Compose statement to select rows by index, of the form
+    Compose statement to select rows by id (to be used by SQLFrame.loc[...])
+    - idx_selected: list of strings, where each string is a row id
+    - col_selected: list of strings, where each string is a col name
 
+    If both rows and cols are selected, return statement of the form:
     'SELECT col_1, ... , col_m FROM my_table WHERE index_name IN ( row_1, ... , row_n );'
 
-    - rows_selected: list of strings, where each string is a row id
-    - cols_selected: list of strings, where each string is a col name
+    Otherwise, return statement of the form
+    'SELECT * FROM my_table WHERE index_name IN ( row_1, ... , row_n );'
     '''
     statement = 'SELECT '
-    statement += ', '.join(cols_selected)
-    statement += ' FROM my_table WHERE '
-    statement += index_name
-    statement += ' IN ( '
-    rows_selected = ["'" + row + "'" for row in rows_selected]
-    statement += ', '.join(rows_selected)
-    statement += ' );'
-    return(statement) # TODO Improve the formatting/type of the return
+    if col_selected is None:
+        statement += '*'
+    else:
+        statement += ', '.join(col_selected)
+    statement += ' FROM my_table'
+    if idx_selected is None:
+        statement += ' ;'
+    else:
+        statement += ' WHERE '
+        statement += index_name
+        statement += ' IN ( '
+        idx_selected = ["'" + row + "'" for row in idx_selected]
+        statement += ', '.join(idx_selected)
+        statement += ' );'
+    return(statement)
 
