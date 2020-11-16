@@ -17,44 +17,38 @@ class SQLFrameLoc():
     '''
     def __init__(self,sqlframe):
         self.sqlframe = sqlframe
+
+    def _format_selection(self,idx_and_col_selected):
+        # Determine whether only row info, or also col info is given. If no col info is given, it's as if all
+        # columns were selected with ":", so we make it a slice(None,None,None)
+        is_there_col_info = isinstance(idx_and_col_selected,tuple)
+        idx_selected = idx_and_col_selected[0] if is_there_col_info else idx_and_col_selected
+        col_selected = idx_and_col_selected[1] if is_there_col_info else slice(None,None,None)
+        # If selecting a slice, forward the slice. If no column selected, then all columns are selected
+        if isinstance(idx_selected,slice): 
+            idx_selected = self.sqlframe.index[idx_selected]
+        if isinstance(col_selected,slice):
+            col_selected = self.sqlframe.columns[col_selected]
+        # Put selected rows (and cols, if any) into lists so that the function
+        # compose_statement_select_rows_by_id can deal with them homogenously
+        if isinstance(idx_selected,str): 
+            idx_selected = [idx_selected]
+        elif isinstance(idx_selected,pd.Index):
+            idx_selected = list(idx_selected)
+        if isinstance(col_selected,str):
+            col_selected = [col_selected]
+        elif isinstance(col_selected,pd.Index):
+            col_selected = list(col_selected)
+        return idx_selected, col_selected
+
     def __getitem__(self,idx_and_col_selected):
-        # TODO Allow indexing with lists of rows and columns, rather than single ones
         '''
         - key_list: list with keys. For example, could be ['Miguel','age'] to 
                     show the cell in row "Miguel" and column "age"
         - rows: single row name, or list with row names
         - columns:  single column name, or list with column names
         '''
-        # Determine whether only row info, or also col info is given
-        is_there_col_info = isinstance(idx_and_col_selected,tuple)
-        idx_selected = idx_and_col_selected[0] if is_there_col_info else idx_and_col_selected
-        col_selected = idx_and_col_selected[1] if is_there_col_info else None
-        # Determine the return type according to the indices given to .loc[...].
-        # Frame formatting across the row or col dimensions is maintained if a list
-        # of rows or cols is given. If no col info is given, it is interpreted as
-        # selecting all cols, so col frame formatting is maintained.
-        # - loc[row, col] : return single value
-        # - loc[row] : return pd.Series
-        # - loc[[row]] : return pd.DataFrame
-        # - loc[[row],[col]] : return pd.DataFrame
-        should_keep_row_formatting = isinstance(idx_selected,list) # TODO Change so that we can also use pandas.Index or tuples in the indexing
-        should_keep_col_formatting = isinstance(col_selected,list) or (col_selected is None)
-        # In Python, ":" indexing produces an object slice(None,None,None),
-        # and it stands for selecting all
-        if isinstance(idx_selected,slice): # TODO Change so that we can use any slice, not just :
-            idx_selected = list(self.sqlframe.index[idx_selected])
-        if isinstance(col_selected,slice):
-            col_selected = list(self.sqlframe.columns[col_selected])
-        # Put selected rows (and cols, if any) into lists so that the function
-        # compose_statement_select_rows_by_id can deal with them homogenously
-        if not isinstance(idx_selected,list): # TODO Change so that we can also use pandas indices or tuples as indices
-            idx_selected = [idx_selected]
-        else:
-            idx_selected = idx_selected
-        if not isinstance(col_selected,list):
-            col_selected = [col_selected]
-        else:
-            col_selected = col_selected
+        idx_selected, col_selected = self._format_selection(idx_and_col_selected)
         # Execute selection
         connection = self.sqlframe.get_connection()
         cursor = connection.cursor()
@@ -68,10 +62,10 @@ class SQLFrameLoc():
         ## Return a dataframe rather than a list
         if col_selected is None:
             col_selected = list(self.sqlframe.columns)
-
         selection = [ [idx_row] +list(selection_row) for idx_row,selection_row in zip(idx_selected,selection)]
         df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+col_selected ).set_index(self.sqlframe._index_name)
-        ## TODO If returning a single column or a single row, check if it is better to return a pandas.Series
+        # Indexing the dataframe created with the original selection allows our return type (single value, pd.Series
+        # or pd.DataFrame) to be consistent with the return type of pandas.DataFrame
         return df.loc[idx_and_col_selected]
         #return selection
         
@@ -83,8 +77,17 @@ class SQLFrameIloc():
         '''
         self.sqlframe = sqlframe
 
-    def __getitem__(self,rowid):
-        pass
+    def __getitem__(self,idx_and_col_selected):
+        # Check if only row info is given, or if also col info is given. If col info is given,
+        # then it is as if all columns were selected with :, so slice(None,None,None)
+        is_there_col_info = isinstance(idx_and_col_selected,tuple)
+        idx_selected = idx_and_col_selected[0] if is_there_col_info else idx_and_col_selected
+        col_selected = idx_and_col_selected[1] if is_there_col_info else slice(None,None,None)
+        # Convert number indexing to string indexing
+        idx_selected = self.sqlframe.index[idx_selected]
+        col_selected = self.sqlframe.columns[col_selected]
+        # Retrieve selected df with string indexing, using SQLFrame.loc[...] method
+        return self.sqlframe.loc[idx_selected,col_selected]
         
 
 class SQLFrame():
@@ -171,7 +174,6 @@ class SQLFrame():
         connection.close()
         return selection
 
-    # TODO Extend so that it works with more than a single row
     # TODO Extend/improve so that we append pandas dataframes and dataseries rather/in addition to dictionaries
     # TODO Insertions (and maybe updates?) should be made to temporary databases, so that we can choose when to save the changes manually
     # with a method such as SQLFrame.save() or something
