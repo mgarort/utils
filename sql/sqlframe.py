@@ -107,7 +107,6 @@ class SQLFrame():
                     SQLFrame, and connecting to existing sqlframes is done through function connect_sqlframe)
         '''
         self.path = path
-        self.columns = columns # TODO self.columns should be a property method which returns the columns
         self._index_name = index 
         self.types = types # TODO Change so that type are determined automatically, rather than passed manually through a dictionary
         self.iloc = SQLFrameIloc(self)
@@ -121,12 +120,10 @@ class SQLFrame():
             # Create the main table
             connection = self.get_connection()
             cursor = connection.cursor()
-            statement = compose_statement_create_table(self.columns,self.types)
+            statement = compose_statement_create_table(columns,self.types)
             cursor.execute(statement)
             connection.commit()
             connection.close()
-
-    # TODO Make a property method that returns the columns, which is self.columns
 
     # NOTE Not made a property method because a property method self.connection suggests that a connection is an attribute 
     # that common to the entire class. However, this method creates a new connection, and self.get_connection() conveys that better
@@ -173,7 +170,7 @@ class SQLFrame():
 
     # TODO Improve the formatting of the returned tables (right now it's a tuple within a list or something like that...)
     @property
-    def tables(self):
+    def _tables(self):
         connection = self.get_connection()
         cursor = connection.cursor()
         statement = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
@@ -194,8 +191,8 @@ class SQLFrame():
         '''
         connection = self.get_connection()
         cursor = connection.cursor()
-        statement = compose_statement_insert_rows(self.columns)
-        values = tuple(row[column] for column in self.columns)
+        statement = compose_statement_insert_rows(self._all_columns)
+        values = tuple(row[column] for column in self._all_columns)
         cursor.execute(statement, values)
         connection.commit()
 
@@ -220,7 +217,25 @@ class SQLFrame():
         connection.close()
         index = [idx[0] for idx in index]
         return index
-
+    @property
+    def _all_columns(self):
+        '''
+        This private method returns all columns, including the index name. Useful to compose SQLite 
+        statements, but not coherent with pandas.columns, which doesn't include the index name in the columns
+        '''
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA table_info( 'my_table' );")
+        info = cursor.fetchall()
+        connection = self.get_connection()
+        all_columns = [row[1] for row in info]
+        return all_columns
+    @property
+    def columns(self):
+        all_columns = self._all_columns
+        columns = all_columns
+        columns.remove(self._index_name)
+        return columns
         
 
 
