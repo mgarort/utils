@@ -145,20 +145,11 @@ class SQLFrame():
 
     @property
     def _n_rows(self):
-        connection = self.get_connection()
-        cursor = connection.cursor()
-        cursor.execute('SELECT count(*) from my_table;')
-        n_rows = cursor.fetchone()[0]
-        connection.close()
+        n_rows = len(self.index)
         return n_rows
-    # TODO Maybe change to simply counting self.columns? And self.columns could be a property method that returns the columns
     @property
     def _n_cols(self):
-        connection = self.get_connection()
-        cursor = connection.cursor()
-        cursor.execute("SELECT count(*) FROM pragma_table_info( 'my_table' ) ;")
-        n_cols = cursor.fetchone()[0]
-        connection.close()
+        n_cols = len(self.columns)
         return n_cols
     @property
     def shape(self):
