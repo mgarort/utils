@@ -37,26 +37,24 @@ class SQLFrameLoc():
         # - loc[row] : return pd.Series
         # - loc[[row]] : return pd.DataFrame
         # - loc[[row],[col]] : return pd.DataFrame
-        should_keep_row_formatting = isinstance(idx_selected,list)
+        should_keep_row_formatting = isinstance(idx_selected,list) # TODO Change so that we can also use pandas.Index or tuples in the indexing
         should_keep_col_formatting = isinstance(col_selected,list) or (col_selected is None)
         # In Python, ":" indexing produces an object slice(None,None,None),
         # and it stands for selecting all
-        if (isinstance(idx_selected,slice) and
-            idx_selected.start is None and
-            idx_selected.stop is None and
-            idx_selected.step is None):
-            idx_selected = None
-        if (isinstance(col_selected,slice) and
-            col_selected.start is None and
-            col_selected.stop is None and
-            col_selected.step is None):
-            col_selected = None
+        if isinstance(idx_selected,slice): # TODO Change so that we can use any slice, not just :
+            idx_selected = list(self.sqlframe.index[idx_selected])
+        if isinstance(col_selected,slice):
+            col_selected = list(self.sqlframe.columns[col_selected])
         # Put selected rows (and cols, if any) into lists so that the function
         # compose_statement_select_rows_by_id can deal with them homogenously
-        if (not isinstance(idx_selected,list)) and (idx_selected is not None):
+        if not isinstance(idx_selected,list): # TODO Change so that we can also use pandas indices or tuples as indices
             idx_selected = [idx_selected]
-        if (not isinstance(col_selected,list)) and (col_selected is not None):
+        else:
+            idx_selected = idx_selected
+        if not isinstance(col_selected,list):
             col_selected = [col_selected]
+        else:
+            col_selected = col_selected
         # Execute selection
         connection = self.sqlframe.get_connection()
         cursor = connection.cursor()
@@ -66,13 +64,16 @@ class SQLFrameLoc():
         connection.close()
         # Convert list of tuples to list of lists, and add the row indices
         if idx_selected is None:
-            idx_selected = self.sqlframe.index # TODO Implement SQLFrame.index method
-        selection = [ [idx_row] +list(selection_row) for idx_row,selection_row in zip(idx_selected,selection)]
+            idx_selected = self.sqlframe.index 
         ## Return a dataframe rather than a list
-        #df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+col_selected ).set_index(self.sqlframe._index_name)
+        if col_selected is None:
+            col_selected = list(self.sqlframe.columns)
+
+        selection = [ [idx_row] +list(selection_row) for idx_row,selection_row in zip(idx_selected,selection)]
+        df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+col_selected ).set_index(self.sqlframe._index_name)
         ## TODO If returning a single column or a single row, check if it is better to return a pandas.Series
-        #return df
-        return selection
+        return df.loc[idx_and_col_selected]
+        #return selection
         
 
 class SQLFrameIloc():
@@ -207,7 +208,7 @@ class SQLFrame():
         index = cursor.fetchall()
         connection.close()
         index = [idx[0] for idx in index]
-        return index
+        return pd.Index(data=index)
     @property
     def _all_columns(self):
         '''
@@ -226,7 +227,7 @@ class SQLFrame():
         all_columns = self._all_columns
         columns = all_columns
         columns.remove(self._index_name)
-        return columns
+        return pd.Index(data=columns)
         
 
 
