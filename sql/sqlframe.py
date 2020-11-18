@@ -80,11 +80,18 @@ class SQLFrameAppend(SQLFrameModification):
         # Append each row iteratively
         indices = self.info
         for idx in indices:
-            __import__('pdb').set_trace()
             values = sqlframe._tmp_df.loc[[idx]].reset_index().iloc[0].tolist()
             cursor.execute(self.statement,values)
         connection.commit()
         connection.close()
+
+class SQLFrameUpdate(SQLFrameModification):
+    '''
+    For update, the attribute info contains a tuble with the row indices and the column names
+    that have been updated.
+    '''
+    def push(self,sqlframe):
+        pass
 
     
 
@@ -289,7 +296,6 @@ class SQLFrame():
         self.loc = SQLFrameLoc(self)
         # Modification queue will hold the changes (insertions, deletions and updates) that are intended on the SQLite database, until they are pushed
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
-        self._modification_queue.sqlframe = self
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
         self._tmp_df = pd.DataFrame(columns=columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
 
@@ -376,9 +382,8 @@ class SQLFrame():
 
         # NOTE If we return self, we don't have to to append_inplace, since right now it isn't really inplace,
         # but rather append to the temporary dataframe
-        return SQLFrame(self.path,self.columns,self._index_name,self.types,_create_from_scratch=False,
-                        _modification_queue=self._modification_queue.add_record.append(list(df.index)),
-                        _tmp_df=self._tmp_df.append(df))
+        self._modification_queue = self._modification_queue.add_record.append(df.index)
+        self._tmp_df = self._tmp_df.append(df)
 
     def __getitem__(self,columns):
         '''
@@ -395,7 +400,6 @@ class SQLFrame():
         temporary dataframe into the database, and clearing the temporary dataframe.
         '''
         # 1. Push the changes to the SQLite database, iterating over the list of changes self._tmp_modifications
-        __import__('pdb').set_trace()
         self._modification_queue.push_all()
         # 2. Clean the temporary dataframe
         self._tmp_df = pd.DataFrame(columns=self._all_columns).set_index(self._index_name)
