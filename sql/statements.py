@@ -18,6 +18,9 @@ def compose_statement_create_table(columns, types):
     # Finish statement
     statement += ' );'
     return statement
+##########################################
+##### Statements to extend the table #####
+##########################################
 
 # TODO To be used by append_inplace
 # TODO Extend it to compose a statement for multiple rows
@@ -39,17 +42,36 @@ def compose_statement_insert_rows(columns):
     # Finish statement
     statement += ' );'
     return statement
-    
 
-# TODO To be used by sqlframe.loc[]  -->  .loc.__getitem__
-def select_rows_statement(self):
+
+##########################################
+##### Statements to update the table #####
+##########################################
+
+def compose_statement_update(idx_selected,col_selected,index_name):
+    '''
+    idx_selected should be a single index
+    '''
+    statement = 'UPDATE my_table SET '
+    col_selected = [f'{col} = ? ' for col in col_selected]
+    statement += ', '.join(col_selected)
+    statement += f"WHERE {index_name} IN ( '{idx_selected}' );"
+    return statement
+
+# UPDATE employees SET name = "Rogers" where id = 2
+    
+########################################
+##### Statements to view the table #####
+########################################
+
+# TODO To be used by sqlframe.[]  -->  __getitem__
+def compose_statement_select_columns(col_selected):
     pass
 
 # TODO To be used by sqlframe.iloc[]
-def select_row_number_statement(n_rows):
+def compose_statement_select_rows_by_number(n_rows):
     pass
 
-# TODO To be used by sqlframe[]  -->  __getitem__
 def compose_statement_select_rows_by_id(idx_selected,col_selected,index_name):
     '''
     Compose statement to select rows by id (to be used by SQLFrame.loc[...])
@@ -71,11 +93,9 @@ def compose_statement_select_rows_by_id(idx_selected,col_selected,index_name):
     if idx_selected is None:
         statement += ' ;'
     else:
-        statement += ' WHERE '
-        statement += index_name
-        statement += ' IN ( '
+        statement += f' WHERE {index_name} IN ( '
         idx_selected = ["'" + row + "'" for row in idx_selected]
         statement += ', '.join(idx_selected)
         statement += ' );'
-    return(statement)
+    return statement 
 

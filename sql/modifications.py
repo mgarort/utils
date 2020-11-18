@@ -35,25 +35,25 @@ class SQLFrameModification(abc.ABC):
     #cursor.execute(statement, values)
     #connection.commit()
 
-    def __init__(self,sqlframe,statement,info):
+    def __init__(self,sqlframe,info):
         '''
         - sqlframe: SQLFrame that the modifications refer to
-        - statement: string that is the SQL statement that needs to be executed to push the operation to the SQL database
+        #- statement: string that is the SQL statement that needs to be executed to push the operation to the SQL database
         - info: necessary information to obtain the values to execute the statement (as in cursor.execute(statement,values))
                 This attribute is not the values per se, but it is the info required to obtain the values from the 
                 temporary dataframe. Depending on whether append, update, drop columns... the values will be obtained differently.
         '''
         self.sqlframe = sqlframe
-        self.statement = statement
         self.info = info # TODO Maybe not necessary to save values because they will be in the dataframe
                              #      Maybe rather than the actual values it should be the rows and indices of the temporal dataframe
 
     # TODO To be made an abstract method
     # XXX Not really needed if only SQLFrameModification is implemented, with statement and values
     @abc.abstractmethod
-    def push(self,connection):
+    def push(self,cursor):
         '''
-        Execute the SQLite modification held by the instance.
+        Execute the SQLite modification held by the instance. Note that it receives only a cursor because the connection is opened,
+        committed and closed in SQLFrameModificationQueue.push_all()
         '''
         pass
         
@@ -61,24 +61,33 @@ class SQLFrameAppend(SQLFrameModification):
     '''
     For append, the attribute info contains the indices of the rows to be appended.
     '''
-    def push(self,sqlframe):
-        connection = sqlframe.get_connection()
-        cursor = connection.cursor()
+    def __init__(self,sqlframe,info):
+        '''
+        - info: indices of the rows that are appended
+        '''
+        super().__init__(sqlframe,info)
+        all_tmp_columns = self.sqlframe._tmp_df.reset_index().columns
+        self.statement = compose_statement_insert_rows(all_tmp_columns) # TODO Could be list of statements if updating several rows. Change to statementS, maybe
+
+    def push(self,cursor):
         # Append each row iteratively
         indices = self.info
         for idx in indices:
-            values = sqlframe._tmp_df.loc[[idx]].reset_index().iloc[0].tolist()
+            values = self.sqlframe._tmp_df.loc[[idx]].reset_index().iloc[0].tolist()
             cursor.execute(self.statement,values)
-        connection.commit()
-        connection.close()
 
 class SQLFrameUpdate(SQLFrameModification):
     '''
     For update, the attribute info contains a tuble with the row indices and the column names
     that have been updated.
     '''
-    def push(self,sqlframe):
-        pass
+    def push(self,cursor):
+        idx_selected, col_selected = info
+        for idx,statement in zip(idx_selected,self.statement):
+            values = self.sqlframe._tmp_df.loc[idx,col_selected] # TODO Check that the final type is correct
+            cursor.execute(statement,values)
+        
+        # TODO Current statement should be in self.statement. Execute it
 
     
 
@@ -123,13 +132,11 @@ class SQLFrameModificationCatalog():
         #statement += ' );'
         #return statement
 
-        statement = compose_statement_insert_rows(columns=self.sqlframe._tmp_df.reset_index().columns)
-        modification = SQLFrameAppend(self.sqlframe,statement,indices)
+        modification = SQLFrameAppend(self.sqlframe,indices)
         
         # TODO Compose statement and save it in modification
         # TODO Save values in modification too if needed. If not, save just None to reflect that the statement is complete and no values are needed
         self.sqlframe._modification_queue.append(modification)
-        return self.sqlframe._modification_queue
 
     def drop_row(self,index_name):
         '''
@@ -170,5 +177,9 @@ class SQLFrameModificationQueue():
         return SQLFrameModificationCatalog(self.sqlframe)
 
     def push_all(self):
+        connection = self.sqlframe.get_connection()
+        cursor = connection.cursor()
         for modification in self.queue:
-            modification.push(self.sqlframe)
+            modification.push(cursor)
+        connection.commit()
+        connection.close()

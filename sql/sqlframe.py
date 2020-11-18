@@ -209,7 +209,7 @@ class SQLFrame():
 
         # NOTE If we return self, we don't have to to append_inplace, since right now it isn't really inplace,
         # but rather append to the temporary dataframe
-        self._modification_queue = self._modification_queue.add_record.append(df.index)
+        self._modification_queue.add_record.append(df.index)
         self._tmp_df = self._tmp_df.append(df)
 
     def __getitem__(self,columns):
