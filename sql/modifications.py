@@ -35,7 +35,7 @@ class SQLFrameModification(abc.ABC):
     #cursor.execute(statement, values)
     #connection.commit()
 
-    def __init__(self,sqlframe,info):
+    def __init__(self,sqlframe):
         '''
         - sqlframe: SQLFrame that the modifications refer to
         #- statement: string that is the SQL statement that needs to be executed to push the operation to the SQL database
@@ -44,8 +44,6 @@ class SQLFrameModification(abc.ABC):
                 temporary dataframe. Depending on whether append, update, drop columns... the values will be obtained differently.
         '''
         self.sqlframe = sqlframe
-        self.info = info # TODO Maybe not necessary to save values because they will be in the dataframe
-                             #      Maybe rather than the actual values it should be the rows and indices of the temporal dataframe
 
     # TODO To be made an abstract method
     # XXX Not really needed if only SQLFrameModification is implemented, with statement and values
@@ -61,18 +59,18 @@ class SQLFrameAppend(SQLFrameModification):
     '''
     For append, the attribute info contains the indices of the rows to be appended.
     '''
-    def __init__(self,sqlframe,info):
+    def __init__(self,sqlframe,indices_appended):
         '''
         - info: indices of the rows that are appended
         '''
-        super().__init__(sqlframe,info)
+        super().__init__(sqlframe)
+        self.indices_appended = indices_appended
         all_tmp_columns = self.sqlframe._tmp_df.reset_index().columns
         self.statement = compose_statement_insert_rows(all_tmp_columns) # TODO Could be list of statements if updating several rows. Change to statementS, maybe
 
     def push(self,cursor):
         # Append each row iteratively
-        indices = self.info
-        for idx in indices:
+        for idx in self.indices_appended:
             values = self.sqlframe._tmp_df.loc[[idx]].reset_index().iloc[0].tolist()
             cursor.execute(self.statement,values)
 
@@ -81,6 +79,14 @@ class SQLFrameUpdate(SQLFrameModification):
     For update, the attribute info contains a tuble with the row indices and the column names
     that have been updated.
     '''
+    def __init__(self,sqlframe,idx_selected,col_selected):
+        '''
+        - info: list or tuple with the row indices selected, and the col names selected for the update.
+        '''
+        super().__init__(sqlframe,idx_selected,col_selected)
+        idx_selected, col_selected = info
+        self.statement = compose_statement_update() # TODO
+
     def push(self,cursor):
         idx_selected, col_selected = info
         for idx,statement in zip(idx_selected,self.statement):
@@ -93,7 +99,10 @@ class SQLFrameUpdate(SQLFrameModification):
 
 
 class SQLFrameModificationCatalog():
-    # NOTE Not necessary to save values because they are in the frame with modifications 
+    '''
+    This class is syntactic sugar. It will be used as an attribute called add_record in the modification queue, so that we can
+    do SQLFrame._modification_queue.add_record.ACTION()
+    '''
     
     def __init__(self,sqlframe):
         self.sqlframe = sqlframe
@@ -113,28 +122,7 @@ class SQLFrameModificationCatalog():
         To record changes made with SQLFrame.append
         - indices
         '''
-
-        #'''
-        #Composes statement to insert a single row, of the form
-        #'INSERT INTO my_table ( column_1, ... , column_2 ) VALUES ( ?, ..., ? );'
-        #- columns: list of str with the names of the columns
-        #'''
-        ## Start statement
-        #statement = 'INSERT INTO my_table ( '
-        ## Add column names (including index, which is the first column)
-        #statement += ', '.join(columns)
-        ## Continue statement
-        #statement += ' ) VALUES ( '
-        ## Add the interrogation signs
-        #n_cols = len(columns)
-        #statement += ', '.join(['?']*n_cols) # '?, ?, ... , ?'
-        ## Finish statement
-        #statement += ' );'
-        #return statement
-
         modification = SQLFrameAppend(self.sqlframe,indices)
-        
-        # TODO Compose statement and save it in modification
         # TODO Save values in modification too if needed. If not, save just None to reflect that the statement is complete and no values are needed
         self.sqlframe._modification_queue.append(modification)
 
@@ -149,11 +137,13 @@ class SQLFrameModificationCatalog():
         To record changes made with SQLFrame.drop(axis=1)
         '''
 
-    def update_values(self,indices):
+    def update_values(self,idx_selected,col_selected):
         '''
         To record changes made with SQLFrame.loc[...] (SQLFrame.loc.__setitem__) or with SQLFrame.iloc[...] (SQLFrame.iloc.__setitem__).
         ... will be recorded in "indices", but maybe change the name of "indices"
         '''
+        modification = SQLFrameUpdate(self.sqlframe,idx_selected,col_selected) 
+        self.sqlframe._modification_queue.append(modification)
 
 class SQLFrameModificationQueue():
     '''
