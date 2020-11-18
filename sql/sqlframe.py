@@ -79,16 +79,8 @@ class SQLFrameLoc():
         self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
         # Record the changes in the modification queue
         idx_selected, col_selected = self._format_selection(idx_and_col_selected)
-        self._modification_queue.add_record.update_values(idx_selected,col_selected)
+        self.sqlframe._modification_queue.add_record.update_values(idx_selected,col_selected)
 
-
-        # Instead of changing the temporary dataframe and the queue of modifications in the current instance, 
-        # return a new instance with these changed.
-
-        # NOTE If we return self, we don't have to to append_inplace, since right now it isn't really inplace,
-        # but rather append to the temporary dataframe
-        self._modification_queue.add_record.append(df.index)
-        self._tmp_df = self._tmp_df.append(df)
 
 class SQLFrameIloc():
     def __init__(self,sqlframe):

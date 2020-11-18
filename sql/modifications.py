@@ -1,5 +1,6 @@
 import abc
-from utils.sql.statements import compose_statement_insert_rows, compose_statement_create_table, compose_statement_select_rows_by_id
+from utils.sql.statements import (compose_statement_insert_rows, compose_statement_create_table, 
+                                  compose_statement_select_rows_by_id, compose_statement_update)
 
 # TODO Each of the following must implement:
 # - Holding all the required information (mainly row/index and column information)
@@ -83,17 +84,18 @@ class SQLFrameUpdate(SQLFrameModification):
         '''
         - info: list or tuple with the row indices selected, and the col names selected for the update.
         '''
-        super().__init__(sqlframe,idx_selected,col_selected)
-        idx_selected, col_selected = info
-        self.statement = compose_statement_update() # TODO
+        super().__init__(sqlframe)
+        self.idx_selected = idx_selected
+        self.col_selected = col_selected
+        self.statements = [compose_statement_update(idx,col_selected,self.sqlframe._index_name) for idx in idx_selected]
 
     def push(self,cursor):
-        idx_selected, col_selected = info
-        for idx,statement in zip(idx_selected,self.statement):
-            values = self.sqlframe._tmp_df.loc[idx,col_selected] # TODO Check that the final type is correct
+        # Update values one row at a time
+        idx_selected = self.idx_selected
+        col_selected = self.col_selected
+        for idx,statement in zip(self.idx_selected, self.statements):
+            values = self.sqlframe._tmp_df.loc[idx, self.col_selected].tolist() 
             cursor.execute(statement,values)
-        
-        # TODO Current statement should be in self.statement. Execute it
 
     
 

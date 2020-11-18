@@ -48,14 +48,14 @@ def compose_statement_insert_rows(columns):
 ##### Statements to update the table #####
 ##########################################
 
-def compose_statement_update(idx_selected,col_selected,index_name):
+def compose_statement_update(idx,col_selected,index_name):
     '''
-    idx_selected should be a single index
+    Compose statements to update the database one row at a time.
     '''
     statement = 'UPDATE my_table SET '
     col_selected = [f'{col} = ? ' for col in col_selected]
     statement += ', '.join(col_selected)
-    statement += f"WHERE {index_name} IN ( '{idx_selected}' );"
+    statement += f"WHERE {index_name} IN ( '{idx}' );"
     return statement
 
 # UPDATE employees SET name = "Rogers" where id = 2
