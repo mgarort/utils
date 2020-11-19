@@ -318,6 +318,27 @@ class SQLFrame():
     # - Define an attribute such as SQLFrame.allowed_to_modify = True, which is changed to False if we do a sensitive operation
     # - Define a decorator to decorate all functions that do certain modifications, which checks whether the attribute is set to False,
     #   and if so throws an error
+    
+    def __repr__(self):
+        n_rows = self.shape[0]
+        pd_max_rows = pd.options.display.max_rows # Maximum number of rows printed by pandas to screen
+        if pd_max_rows == 0:
+            raise NotImplementedError('Printing to screen is not implemented when the maximum number of rows printed by pandas is 0.')
+        # If our dataframe has more rows than pd_max_rows, we'll send to screen just a little bit more so that it gets printed with ... ,
+        # and we'll manually set the number of columns and rows in the last line of output
+        need_to_trim = True if n_rows > pd_max_rows else False
+        if need_to_trim:
+            n_head_and_tail = int(np.ceil((pd_max_rows+2)/2)) # Number of rows from the head and tail of the dataframe to print to screen
+            idx_to_print = self.index[:n_head_and_tail].append(self.index[-n_head_and_tail:])  
+            raw_string = self.loc[idx_to_print].__repr__()
+            size_info = f'\n\n[{self.shape[0]} rows x {self.shape[1]} columns]'
+            string = '\n'.join(raw_string.split('\n')[:-1]) + size_info
+        else:
+            string = self.loc[self.index].__repr__()
+        return string
+
+    def __str__(self):
+        return self.__repr__()
         
 
 
