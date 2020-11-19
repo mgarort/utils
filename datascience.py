@@ -51,6 +51,11 @@ def split_dataframe(df, split_fractions, shuffle=True, random_seed=None, filenam
     return train, val, test
 
 
+def get_type_string(object):
+    '''
+    Given an object, returns a string representing its type
+    '''
+    return type(object).__name__
 
 
 

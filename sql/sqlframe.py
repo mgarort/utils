@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import pandas as pd
+import numpy as np
 from .modifications import (SQLFrameModification, SQLFrameUpdate, SQLFrameAppend, 
                             SQLFrameModificationCatalog, 
                             SQLFrameModificationQueue)
@@ -72,14 +73,27 @@ class SQLFrameLoc():
         return df.loc[idx_and_col_selected]
     def __setitem__(self,key,value):
         '''
-        In order to update values with SQLFrame.loc[idx_selected,col_selected] = ...
+        In order to either:
+        - Update values with SQLFrame.loc[idx_selected,col_selected] = ...   , or
+        - Create a new column with values
         '''
-        # Make changes on the temporary dataframe
         idx_and_col_selected = key
-        self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
-        # Record the changes in the modification queue
+        # Decide which type of modification we're dealing with, and append it to the modification queue
         idx_selected, col_selected = self._format_selection(idx_and_col_selected)
-        self.sqlframe._modification_queue.add_record.update_values(idx_selected,col_selected)
+        missing_column = np.array([(col not in self.sqlframe._sql_columns) for col in col_selected]).any() # Is some column in the selection not in the SQL table?
+        if not missing_column: # If not missing column, update
+            # Make changes on the temporary dataframe
+            self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
+            # Record the changes in the modification queue
+            self.sqlframe._modification_queue.add_record.update_values(idx_selected,col_selected)
+        elif missing_column and len(col_selected) == 1:  # Create new columns one at a time only
+            # Make changes on the temporary dataframe
+            self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
+            # TODO Do something to handle missing values in new columns better. Can only create a new column if values for all rows are given
+            self.sqlframe._modification_queue.add_record.add_single_column(col_selected)
+        else:
+            NotImplementedError('Allowed actions are to update values in existing columns, or to create a new single column.')
+
 
 
 class SQLFrameIloc():
@@ -125,6 +139,8 @@ class SQLFrame():
         - _modification_queue: we allow the possibility to receive this, so that the return of operations can be a new SQLFrame
                                rather than making every modification in place.
         '''
+        # TODO Improve how the arguments are given. Rather than _create_from_scratch , we could have an argument that can
+        # take the values 'create' (new database), 'load' (from file), or something like that
         self.path = path
         self._index_name = index_name
         self.types = types # TODO Change so that type are determined automatically, rather than passed manually through a dictionary
@@ -134,10 +150,11 @@ class SQLFrame():
         # Modification queue will hold the changes (insertions, deletions and updates) that are intended on the SQLite database, until they are pushed
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
-        self._tmp_df = pd.DataFrame(columns=columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
+        if _create_from_scratch:
+            self._tmp_df = pd.DataFrame(columns=columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
+        else:
+            self._tmp_df = self.create_mirror_dataframe()        # TODO If we are not creating the database from scratch , then we should create a temporary dataframe that matches the database dimensions
 
-        # TODO Different temporary dataframes for new row insertions, new column insertions, updates or deletions. If any of them is 
-        # changed, we cannot make changes to the others. We need to do SQLFrame.save() before switching from one type of change to another
         # If we are to create a new database: 1) Raise error if it already exists 2) Create the main table (the latter is not necessary if 
         # database already exists)
         if _create_from_scratch:
@@ -151,6 +168,15 @@ class SQLFrame():
             cursor.execute(statement)
             connection.commit()
             connection.close()
+
+    def create_mirror_dataframe(self):
+        '''
+        This method returns an empty dataframe that mirrors the database, in the sense that it has the same
+        columns and index as it has.
+        '''
+        mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name)
+        mirror_df[self._index_name] = self._sql_index
+        return mirror_df.set_index(self._index_name)
 
     # NOTE Not a property method because a property method self.connection suggests that a connection is an attribute that
     # is common to the entire class. However, this method creates a new connection, and self.get_connection() conveys that better
@@ -171,19 +197,11 @@ class SQLFrame():
         return self.get_connection().cursor()
 
     @property
-    def _n_rows(self):
-        n_rows = len(self.index)
-        return n_rows
-    @property
-    def _n_cols(self):
-        n_cols = len(self.columns)
-        return n_cols
-    @property
     def shape(self):
         '''
         Returns a tuple with the number of rows and the number of columns, as in numpy and pandas
         '''
-        return (self._n_rows, self._n_cols)
+        return (len(self.index), len(self.columns))
 
 
     # TODO Improve the formatting of the returned tables (right now it's a tuple within a list or something like that...)
@@ -228,8 +246,7 @@ class SQLFrame():
         '''
         return self.loc[:,columns]
     def __setitem__(self,key,value):
-        raise RuntimeError('''Setting columns for all datapoints is discouraged for big databases. 
-                If you really wanna do it, use SQLFrame.loc[:, columns], but watch the memory requirements.''')
+        self.loc[:,key] = value
 
     def save(self):
         '''
@@ -239,7 +256,7 @@ class SQLFrame():
         # 1. Push the changes to the SQLite database, iterating over the list of changes self._tmp_modifications
         self._modification_queue.push_all()
         # 2. Clean the temporary dataframe
-        self._tmp_df = pd.DataFrame(columns=self._all_columns).set_index(self._index_name)
+        self._tmp_df = self.create_mirror_dataframe()
         # TODO After changing the columns, we need to save the temporary dataframe. That's a rule for now
 
 
@@ -250,20 +267,21 @@ class SQLFrame():
         '''
         self._index_name = index_name
 
-    # XXX Currently a bug. We have to return the index of the _tmp_df, rather than the SQLite table
     @property
-    def index(self):
-        #connection = self.get_connection()
-        #cursor = connection.cursor()
-        #statement = 'SELECT ' + self._index_name + ' FROM my_table;'
-        #cursor.execute(statement)
-        #index = cursor.fetchall()
-        #connection.close()
-        #index = [idx[0] for idx in index]
-        #return pd.Index(data=index)
-        return self._tmp_df.index
+    def _sql_index(self):
+        '''
+        Returns the index in the SQL
+        '''
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        statement = 'SELECT ' + self._index_name + ' FROM my_table;'
+        cursor.execute(statement)
+        index = cursor.fetchall()
+        connection.close()
+        index = [idx[0] for idx in index]
+        return pd.Index(data=index)
     @property
-    def _all_columns(self):
+    def _sql_columns(self):
         '''
         This private method returns all columns, including the index name. Useful to compose SQLite 
         statements, but not coherent with pandas.columns, which doesn't include the index name in the columns
@@ -276,13 +294,19 @@ class SQLFrame():
         all_columns = [row[1] for row in info]
         return all_columns
     @property
+    def index(self):
+        return self._tmp_df.index
+    @property
     def columns(self):
-        all_columns = self._all_columns
+        all_columns = self._sql_columns
         columns = all_columns
         columns.remove(self._index_name)
         return pd.Index(data=columns)
 
-    # TODO Write __setattr__ to set the columns, if we want to change them. After messing with the columns we have to save
+    # TODO Write decorator to force to save after certain operations, such as adding a new column or changing the index. We could:
+    # - Define an attribute such as SQLFrame.allowed_to_modify = True, which is changed to False if we do a sensitive operation
+    # - Define a decorator to decorate all functions that do certain modifications, which checks whether the attribute is set to False,
+    #   and if so throws an error
         
 
 

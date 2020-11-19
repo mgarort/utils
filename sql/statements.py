@@ -1,3 +1,6 @@
+from ..datascience import get_type_string
+
+
 def compose_statement_create_table(columns, types):
     '''
     Composes statement to create table, of the form
@@ -18,12 +21,14 @@ def compose_statement_create_table(columns, types):
     # Finish statement
     statement += ' );'
     return statement
+
+
 ##########################################
 ##### Statements to extend the table #####
 ##########################################
 
-# TODO To be used by append_inplace
 # TODO Extend it to compose a statement for multiple rows
+# To be used by SQLFrameAppend
 def compose_statement_insert_rows(columns):
     '''
     Composes statement to insert a single row, of the form
@@ -43,6 +48,11 @@ def compose_statement_insert_rows(columns):
     statement += ' );'
     return statement
 
+# To be used by SQLFrameAddSingleColumn, as a pair
+def compose_statement_add_single_column(column,column_type):
+    return f'ALTER TABLE my_table ADD {column} {column_type} ;'
+
+
 
 ##########################################
 ##### Statements to update the table #####
@@ -58,7 +68,6 @@ def compose_statement_update(idx,col_selected,index_name):
     statement += f"WHERE {index_name} IN ( '{idx}' );"
     return statement
 
-# UPDATE employees SET name = "Rogers" where id = 2
     
 ########################################
 ##### Statements to view the table #####
