@@ -112,11 +112,12 @@ class SQLFrameAddSingleColumn(SQLFrameModification):
     def push(self,connection):
         # Add the new column
         cursor = connection.cursor()
+        __import__('pdb').set_trace()
         cursor.execute(self.add_column_statement)
         connection.commit()
         # Fill it
         for idx, statement in zip(self.sqlframe._tmp_df.index, self.fill_column_statements):
-            value = [self.sqlframe._tmp_df.loc[idx,self.col_name]]
+            value = [self.sqlframe._tmp_df.loc[idx,self.col_name[0]]]
             __import__('pdb').set_trace()
             cursor.execute(statement,value)
 
@@ -138,7 +139,7 @@ class SQLFrameModificationCatalog():
         (if it existed we should update rather than insert it)
         If trying to insert several columns with this syntax, maybe raise a NotImplementedError
         '''
-        col_type = get_type_string(self.sqlframe._tmp_df[col_name].iloc[0])  # Get type of first element, assuming all the types are the same
+        col_type = get_type_string(self.sqlframe._tmp_df[col_name[0]].iloc[0])  # Get type of first element, assuming all the types are the same
         modification = SQLFrameAddSingleColumn(self.sqlframe,col_name,col_type)
         self.sqlframe._modification_queue.append(modification)
         # TODO After inserting columns you need to save if you want to keep working. That should be made a rule. Later we can think about how to avoid it.

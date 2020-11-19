@@ -50,7 +50,7 @@ def compose_statement_insert_rows(columns):
 
 # To be used by SQLFrameAddSingleColumn, as a pair
 def compose_statement_add_single_column(column,column_type):
-    return f'ALTER TABLE my_table ADD {column} {column_type} ;'
+    return f'ALTER TABLE my_table ADD {column[0]} {column_type} ;'
 
 
 
