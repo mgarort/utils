@@ -45,14 +45,10 @@ class SQLFrameLoc():
             col_selected = list(col_selected)
         return idx_selected, col_selected
 
-    def __getitem__(self,idx_and_col_selected):
+    def _sql_loc(self,idx_selected,col_selected):
         '''
-        - key_list: list with keys. For example, could be ['Miguel','age'] to 
-                    show the cell in row "Miguel" and column "age"
-        - rows: single row name, or list with row names
-        - columns:  single column name, or list with column names
+        This method grabs the values queried from the SQL table, and returns them as a pandas dataframe.
         '''
-        idx_selected, col_selected = self._format_selection(idx_and_col_selected)
         # Execute selection
         connection = self.sqlframe.get_connection()
         cursor = connection.cursor()
@@ -70,7 +66,22 @@ class SQLFrameLoc():
         df = pd.DataFrame(selection, columns = [self.sqlframe._index_name]+col_selected ).set_index(self.sqlframe._index_name)
         # Indexing the dataframe created with the original selection allows our return type (single value, pd.Series
         # or pd.DataFrame) to be consistent with the return type of pandas.DataFrame
-        return df.loc[idx_and_col_selected]
+        try:
+            return df.loc[idx_selected,col_selected]
+        except KeyError:
+            return df
+
+    def __getitem__(self,idx_and_col_selected):
+        '''
+        - key_list: list with keys. For example, could be ['Miguel','age'] to 
+                    show the cell in row "Miguel" and column "age"
+        - rows: single row name, or list with row names
+        - columns:  single column name, or list with column names
+        '''
+        idx_selected, col_selected = self._format_selection(idx_and_col_selected)
+        #return self.sqlframe._tmp_df.loc[idx_and_col_selected].combine_first(self._sql_loc(idx_and_col_selected))
+        return self._sql_loc(idx_selected,col_selected).combine_first(self.sqlframe._tmp_df.loc[idx_selected,col_selected]).loc[idx_and_col_selected]
+
     def __setitem__(self,key,value):
         '''
         In order to either:
