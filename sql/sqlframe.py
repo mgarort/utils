@@ -154,7 +154,7 @@ class SQLFrame():
         # TODO Improve how the arguments are given. Rather than _create_from_scratch , we could have an argument that can
         # take the values 'create' (new database), 'load' (from file), or something like that
         self.path = path
-        base_df_index_name, base_df_columns, base_df_types = self.get_base_df_info(base_dataframe) 
+        base_df_index_name, base_df_columns = self.get_idx_and_col_names_info(base_dataframe) 
         self._index_name = base_df_index_name
         # Attributes loc and iloc are used to implement .loc[...] and .iloc[...] indexing
         self.iloc = SQLFrameIloc(self)
@@ -173,6 +173,8 @@ class SQLFrame():
             # Check if already exists
             if os.path.isfile(path):
                 raise RuntimeError('File already exists in that location.')
+            # Get the type of each column from the base dataframe
+            base_df_types = self.get_col_types_info(base_dataframe)
             # Create the main table, with the same column names and types as the base dataframe we're replicating
             connection = self.get_connection()
             cursor = connection.cursor()
@@ -181,19 +183,27 @@ class SQLFrame():
             connection.commit()
             connection.close()
 
-    def get_base_df_info(self, base_dataframe):
+    def get_idx_and_col_names_info(self, base_dataframe):
         '''
         Given a base dataframe whose structure we're trying to replicate, it returns
-        the index name, the column names and the column types.
+        the index name and the column names.
         '''
         index_name = base_dataframe.index.name
+        columns = base_dataframe.reset_index().columns
+        return index_name, columns
+
+    def get_col_types_info(self, base_dataframe):
+        '''
+        Given a base dataframe whose structure we're trying to replicate, it returns
+        the column types.
+        '''
         columns = base_dataframe.reset_index().columns
         types = {}
         for col in columns:
             first_item = base_dataframe.reset_index().iloc[0].loc[col]
             col_type = get_type_string(first_item) # Assuming the whole column has the same type. This is a requirement of SQLite
             types[col] = col_type
-        return index_name, columns, types
+        return types
 
     def create_mirror_dataframe(self):
         '''
@@ -356,7 +366,9 @@ class SQLFrame():
         return self.__repr__()
         
 
-
+# TODO Instead of passing index (i.e. the column name to use as index), create a different table in the SQLdatabase that stores only the 
+# index name. Instead of having "my_table", this one could be called "data_table", and the index table could be called "index_table", 
+# with a single columns of type string called "index_name"
 def read_sqlframe(path,index):
     # Get column and type info
     connection = get_sqlite_connection(path)
@@ -366,7 +378,8 @@ def read_sqlframe(path,index):
     columns = [row[1] for row in info]
     types = {row[1]:row[2] for row in info}
     # Create sqlframe
-    sf = SQLFrame(path=path,columns=columns,index=index,types=types,_create_from_scratch=False)
+    df = pd.DataFrame(columns=columns).set_index(index)
+    sf = SQLFrame(path=path,base_dataframe=df,_create_from_scratch=False)
     return sf
     
 
