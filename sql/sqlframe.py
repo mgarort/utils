@@ -6,6 +6,7 @@ from .modifications import (SQLFrameModification, SQLFrameUpdate, SQLFrameAppend
                             SQLFrameModificationCatalog, 
                             SQLFrameModificationQueue)
 from utils.sql.statements import compose_statement_insert_rows, compose_statement_create_table, compose_statement_select_rows_by_id
+from ..datascience import get_type_string
 
 def get_sqlite_connection(path):
     try:
@@ -137,7 +138,7 @@ class SQLFrame():
     # NOTE Commiting is to be done manually, not within the exit function
     # TODO Define __str__ so that sqlframe is printed to the REPL
 
-    def __init__(self,path,columns,index_name,types,_create_from_scratch=True,_modification_queue=None,_tmp_df=None):
+    def __init__(self,path,base_dataframe,_create_from_scratch=True,_modification_queue=None,_tmp_df=None):
         '''
         If path is given, then init loads the database in the path. Otherwise, it creates a new database.
         - path: path for the database to be created
@@ -153,8 +154,8 @@ class SQLFrame():
         # TODO Improve how the arguments are given. Rather than _create_from_scratch , we could have an argument that can
         # take the values 'create' (new database), 'load' (from file), or something like that
         self.path = path
-        self._index_name = index_name
-        self.types = types # TODO Change so that type are determined automatically, rather than passed manually through a dictionary
+        base_df_index_name, base_df_columns, base_df_types = self.get_base_df_info(base_dataframe) 
+        self._index_name = base_df_index_name
         # Attributes loc and iloc are used to implement .loc[...] and .iloc[...] indexing
         self.iloc = SQLFrameIloc(self)
         self.loc = SQLFrameLoc(self)
@@ -162,7 +163,7 @@ class SQLFrame():
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
         if _create_from_scratch:
-            self._tmp_df = pd.DataFrame(columns=columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
+            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
         else:
             self._tmp_df = self.create_mirror_dataframe()        # TODO If we are not creating the database from scratch , then we should create a temporary dataframe that matches the database dimensions
 
@@ -172,13 +173,27 @@ class SQLFrame():
             # Check if already exists
             if os.path.isfile(path):
                 raise RuntimeError('File already exists in that location.')
-            # Create the main table
+            # Create the main table, with the same column names and types as the base dataframe we're replicating
             connection = self.get_connection()
             cursor = connection.cursor()
-            statement = compose_statement_create_table(columns,self.types)
+            statement = compose_statement_create_table(base_df_columns,base_df_types)
             cursor.execute(statement)
             connection.commit()
             connection.close()
+
+    def get_base_df_info(self, base_dataframe):
+        '''
+        Given a base dataframe whose structure we're trying to replicate, it returns
+        the index name, the column names and the column types.
+        '''
+        index_name = base_dataframe.index.name
+        columns = base_dataframe.reset_index().columns
+        types = {}
+        for col in columns:
+            first_item = base_dataframe.reset_index().iloc[0].loc[col]
+            col_type = get_type_string(first_item) # Assuming the whole column has the same type. This is a requirement of SQLite
+            types[col] = col_type
+        return index_name, columns, types
 
     def create_mirror_dataframe(self):
         '''
