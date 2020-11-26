@@ -1,4 +1,5 @@
 import os
+import io
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -8,9 +9,27 @@ from .modifications import (SQLFrameModification, SQLFrameUpdate, SQLFrameAppend
 from utils.sql.statements import compose_statement_insert_rows, compose_statement_create_table, compose_statement_select_rows_by_id
 from ..datascience import get_type_string
 
+# Adapter and converter so that we can save numpy arrays to SQLite
+def adapt_array(arr):
+    """
+    http://stackoverflow.com/a/31312102/190597 (SoulNibbler)
+    """
+    out = io.BytesIO()
+    np.save(out, arr)
+    out.seek(0)
+    return sqlite3.Binary(out.read())
+def convert_array(text):
+    out = io.BytesIO(text)
+    out.seek(0)
+    return np.load(out)
+# Converts np.array to TEXT when inserting
+sqlite3.register_adapter(np.ndarray, adapt_array)
+# Converts TEXT to np.array when selecting
+sqlite3.register_converter('ndarray', convert_array)
+
 def get_sqlite_connection(path):
     try:
-        connection = sqlite3.connect(path)
+        connection = sqlite3.connect(path,detect_types=sqlite3.PARSE_DECLTYPES)
         return connection
     except sqlite3.Error as e:
         print(e)
@@ -135,8 +154,8 @@ class SQLFrame():
     '''
 
     # NOTE A SQLFrame is a sqlite3 database with a single table. The name of the table can always be the same, and it can be "table"
-    # NOTE Commiting is to be done manually, not within the exit function
-    # TODO Define __str__ so that sqlframe is printed to the REPL
+
+
 
     def __init__(self,path,base_dataframe,_create_from_scratch=True,_modification_queue=None,_tmp_df=None):
         '''
@@ -154,7 +173,7 @@ class SQLFrame():
         # TODO Improve how the arguments are given. Rather than _create_from_scratch , we could have an argument that can
         # take the values 'create' (new database), 'load' (from file), or something like that
         self.path = path
-        base_df_index_name, base_df_columns = self.get_idx_and_col_names_info(base_dataframe) 
+        base_df_index_name, base_df_columns = self.get_idx_and_col_names_info(base_dataframe)  # TODO Maybe if a database is given as a base, the values should be copied. Also, maybe the base dataframe should be the first argument, so that we can do  `sf = SQLFrame(df, path=some_path)`
         self._index_name = base_df_index_name
         # Attributes loc and iloc are used to implement .loc[...] and .iloc[...] indexing
         self.iloc = SQLFrameIloc(self)
@@ -175,6 +194,7 @@ class SQLFrame():
                 raise RuntimeError('File already exists in that location.')
             # Get the type of each column from the base dataframe
             base_df_types = self.get_col_types_info(base_dataframe)
+            __import__('pdb').set_trace()
             # Create the main table, with the same column names and types as the base dataframe we're replicating
             connection = self.get_connection()
             cursor = connection.cursor()
@@ -265,8 +285,8 @@ class SQLFrame():
         '''
         if verify_integrity: # NOTE In the original pandas, verify_integrity is False by default
             if df.index.isin(self.index).any():
-                raise ValueError('Tried to append datapoint whose index is already in the database.')
-
+                raise ValueError('Tried to append datapoint whose index is already in the database.') # ValueError because verify_integrity in pandas raises
+                                                                                                      # a ValueError
 
         # Instead of changing the temporary dataframe and the queue of modifications in the current instance, 
         # return a new instance with these changed.
@@ -275,6 +295,8 @@ class SQLFrame():
         # but rather append to the temporary dataframe
         self._modification_queue.add_record.append(df.index)
         self._tmp_df = self._tmp_df.append(df)
+
+    # TODO Return _sql_types that returns the type string assigned to each column in the SQL dataframe
 
     def __getitem__(self,columns):
         '''
