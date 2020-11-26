@@ -100,7 +100,10 @@ class SQLFrameLoc():
         '''
         idx_selected, col_selected = self._format_selection(idx_and_col_selected)
         #return self.sqlframe._tmp_df.loc[idx_and_col_selected].combine_first(self._sql_loc(idx_and_col_selected))
-        return self._sql_loc(idx_selected,col_selected).combine_first(self.sqlframe._tmp_df.loc[idx_selected,col_selected]).loc[idx_and_col_selected]
+        #return self._sql_loc(idx_selected,col_selected).combine_first(self.sqlframe._tmp_df.loc[idx_selected,col_selected]).loc[idx_and_col_selected]
+        return self.sqlframe._tmp_df.loc[idx_selected,col_selected].combine_first(self._sql_loc(idx_selected,col_selected))#.loc[idx_and_col_selected]
+        # TODO What if the SQL stores a "None"? In that case, combine_first doesn't replace the values in tmp_df by the values in the SQL table, and we get
+        # NaN (what is in the table) instead of "None". Possible solution: filling the temporary dataframe with None rather than NaN
 
     def __setitem__(self,key,value):
         '''
@@ -114,6 +117,7 @@ class SQLFrameLoc():
         missing_column = np.array([(col not in self.sqlframe._sql_columns) for col in col_selected]).any() # Is some column in the selection not in the SQL table?
         if not missing_column: # If not missing column, update
             # Make changes on the temporary dataframe
+            __import__('pdb').set_trace()
             self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
             # Record the changes in the modification queue
             self.sqlframe._modification_queue.add_record.update_values(idx_selected,col_selected)
@@ -182,7 +186,7 @@ class SQLFrame():
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
         if _create_from_scratch:
-            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name) if _tmp_df is None else _tmp_df 
+            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name).replace({np.nan:None})  if _tmp_df is None else _tmp_df 
         else:
             self._tmp_df = self.create_mirror_dataframe()        # TODO If we are not creating the database from scratch , then we should create a temporary dataframe that matches the database dimensions
 
@@ -194,7 +198,6 @@ class SQLFrame():
                 raise RuntimeError('File already exists in that location.')
             # Get the type of each column from the base dataframe
             base_df_types = self.get_col_types_info(base_dataframe)
-            __import__('pdb').set_trace()
             # Create the main table, with the same column names and types as the base dataframe we're replicating
             connection = self.get_connection()
             cursor = connection.cursor()
@@ -230,8 +233,9 @@ class SQLFrame():
         This method returns an empty dataframe that mirrors the database, in the sense that it has the same
         columns and index as it has.
         '''
-        mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name)
+        mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name) 
         mirror_df[self._index_name] = self._sql_index
+        mirror_df = mirror_df.replace({np.nan:None}) 
         return mirror_df.set_index(self._index_name)
 
     # NOTE Not a property method because a property method self.connection suggests that a connection is an attribute that
