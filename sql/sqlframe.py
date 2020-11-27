@@ -103,7 +103,9 @@ class SQLFrameLoc():
         mask_is_null = self.sqlframe._tmp_df.loc[idx_selected,col_selected].isnull()
         mask_is_not_none = np.logical_not(check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected]))
         mask_is_nan = mask_is_not_none & mask_is_null
-        return self.sqlframe._tmp_df.loc[idx_selected,col_selected].mask(mask_is_nan,self._sql_loc(idx_selected,col_selected))
+        return (self.sqlframe._tmp_df.loc[idx_selected,col_selected]
+                .mask(mask_is_nan,self._sql_loc(idx_selected,col_selected)) # Return the temporary dataframe, with NaN values filled by the SQL table
+                .loc[idx_and_col_selected])  # This final selection is done so that the return shape is equivalent to that of a DataFrame)
         # TODO What if the SQL stores a "None"? In that case, combine_first doesn't replace the values in tmp_df by the values in the SQL table, and we get
         # NaN (what is in the table) instead of "None".
         # - Possible solution: filling the temporary dataframe with None rather than NaN
