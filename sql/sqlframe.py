@@ -202,7 +202,7 @@ class SQLFrame():
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
         if _create_from_scratch:
-            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name).replace({np.nan:None})  if _tmp_df is None else _tmp_df 
+            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name).replace({np.nan:None}).astype(object)  if _tmp_df is None else _tmp_df.astype(object)
         else:
             self._tmp_df = self.create_mirror_dataframe()        # TODO If we are not creating the database from scratch , then we should create a temporary dataframe that matches the database dimensions
 
@@ -249,9 +249,9 @@ class SQLFrame():
         This method returns an empty dataframe that mirrors the database, in the sense that it has the same
         columns and index as it has.
         '''
-        mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name) 
+        mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name).astype(object) 
         mirror_df[self._index_name] = self._sql_index
-        mirror_df = mirror_df.replace({np.nan:None}) 
+        mirror_df = mirror_df.replace({np.nan:None}) # TODO Is this really necessary? I think SQLite NULL may already be represented as None
         return mirror_df.set_index(self._index_name)
 
     # NOTE Not a property method because a property method self.connection suggests that a connection is an attribute that
@@ -406,6 +406,10 @@ class SQLFrame():
 
     def __str__(self):
         return self.__repr__()
+
+    @property
+    def values(self):
+        return self.loc[:].values
         
 
 # TODO Instead of passing index (i.e. the column name to use as index), create a different table in the SQLdatabase that stores only the 
