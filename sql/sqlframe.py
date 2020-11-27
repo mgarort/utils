@@ -7,7 +7,7 @@ from .modifications import (SQLFrameModification, SQLFrameUpdate, SQLFrameAppend
                             SQLFrameModificationCatalog, 
                             SQLFrameModificationQueue)
 from utils.sql.statements import compose_statement_insert_rows, compose_statement_create_table, compose_statement_select_rows_by_id
-from ..datascience import get_type_string
+from ..datascience import get_type_string, check_is_none_array
 
 # Adapter and converter so that we can save numpy arrays to SQLite
 def adapt_array(arr):
@@ -99,13 +99,30 @@ class SQLFrameLoc():
         - columns:  single column name, or list with column names
         '''
         idx_selected, col_selected = self._format_selection(idx_and_col_selected)
-        #return self.sqlframe._tmp_df.loc[idx_and_col_selected].combine_first(self._sql_loc(idx_and_col_selected))
-        #return self._sql_loc(idx_selected,col_selected).combine_first(self.sqlframe._tmp_df.loc[idx_selected,col_selected]).loc[idx_and_col_selected]
-        return self.sqlframe._tmp_df.loc[idx_selected,col_selected].combine_first(self._sql_loc(idx_selected,col_selected))#.loc[idx_and_col_selected]
+        #return self.sqlframe._tmp_df.loc[idx_selected,col_selected].combine_first(self._sql_loc(idx_selected,col_selected))#.loc[idx_and_col_selected]
+        mask_is_null = self.sqlframe._tmp_df.loc[idx_selected,col_selected].isnull()
+        mask_is_not_none = check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected])
+        mask_is_nan = mask_is_not_none & mask_is_null
+        return self.sqlframe._tmp_df.loc[idx_selected,col_selected].mask(mask_is_nan,self._sql_loc(idx_selected,col_selected))
         # TODO What if the SQL stores a "None"? In that case, combine_first doesn't replace the values in tmp_df by the values in the SQL table, and we get
-        # NaN (what is in the table) instead of "None". Possible solution: filling the temporary dataframe with None rather than NaN
+        # NaN (what is in the table) instead of "None".
+        # - Possible solution: filling the temporary dataframe with None rather than NaN
 
     def __setitem__(self,key,value):
+        # TODO Currently, we cannot set values with chained operations, like sf.iloc[0].loc['inchikey'] = new_value. So we should be careful with this
+        # What would be a way to always refer to the appropriate __setitem__ method?
+        # TODO Maybe I've taken the wrong approach, and I shouldn't try to save the changes in a modification queue. I should try to operate directly on a
+        # combination of the temporary dataframe and the SQL table (like the combination obtained by combine_first), and later on identify the changes
+        # and execute them. This would not have the problem of chained operations, because temporary operations would operate on a normal pandas
+        # dataframe, and pandas dataframes allow all these. The update of the SQL table could go as follows:
+        # 1) Check the columns. If a column has been added or deleted, update the SQL table accordingly
+        # 2) Check the indices. If a row has been added or deleted, update the SQL table accordingly
+        # 3) Check what values are not NaN/None in the temporary dataframe. Update those non-null values in the SQL table
+        # Possible disadvantages of this approach is that we may not be able to use None/NaN values in our updates, because they may be mixed with
+        # the None/NaN in the temporary dataframe. Maybe as a solution we could always use a string "None" rather than a true None value. And maybe in the future we can think of something more sophisticated.
+        # - Another possible solution: firt check whether the values are actually equal to None, and replace those. Then check if the values are not null, meaning they are neither None not NaN, and replace those. However, this may give problems in the visualization with combine_first, if we choose to fill the temporary dataframe with NaN, and then also have some None
+        # XXX There is no solution that distinguishes None and NaN. The reason is that for pandas, None and nan are the same because under the hood, it uses numpy, and for numpy there's only np.nan. That is why pandas.DataFrame.isna() is EXACTLY THE SAME as pandas.DataFrame.isnull(). So the only solution to differentiate is to use a string as None, for instance 'NONE'    https://datascience.stackexchange.com/questions/37878/difference-between-isna-and-isnull-in-pandas
+
         '''
         In order to either:
         - Update values with SQLFrame.loc[idx_selected,col_selected] = ...   , or
@@ -117,7 +134,6 @@ class SQLFrameLoc():
         missing_column = np.array([(col not in self.sqlframe._sql_columns) for col in col_selected]).any() # Is some column in the selection not in the SQL table?
         if not missing_column: # If not missing column, update
             # Make changes on the temporary dataframe
-            __import__('pdb').set_trace()
             self.sqlframe._tmp_df.loc[idx_and_col_selected] = value
             # Record the changes in the modification queue
             self.sqlframe._modification_queue.add_record.update_values(idx_selected,col_selected)
