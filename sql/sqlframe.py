@@ -103,6 +103,7 @@ class SQLFrameLoc():
         mask_is_null = self.sqlframe._tmp_df.loc[idx_selected,col_selected].isnull()
         mask_is_not_none = np.logical_not(check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected]))
         mask_is_nan = mask_is_not_none & mask_is_null
+        __import__('pdb').set_trace()
         return (self.sqlframe._tmp_df.loc[idx_selected,col_selected]
                 .mask(mask_is_nan,self._sql_loc(idx_selected,col_selected)) # Return the temporary dataframe, with NaN values filled by the SQL table
                 .loc[idx_and_col_selected])  # This final selection is done so that the return shape is equivalent to that of a DataFrame)
@@ -204,7 +205,7 @@ class SQLFrame():
         self._modification_queue = SQLFrameModificationQueue(self) if _modification_queue is None else _modification_queue
         # Temporary dataframe will hold the values of the changes  until they are pushed to the SQLite database
         if _create_from_scratch:
-            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name).replace({np.nan:None}).astype(object)  if _tmp_df is None else _tmp_df.astype(object)
+            self._tmp_df = pd.DataFrame(columns=base_df_columns).set_index(self._index_name).astype(object)  if _tmp_df is None else _tmp_df.astype(object)
         else:
             self._tmp_df = self.create_mirror_dataframe()        # TODO If we are not creating the database from scratch , then we should create a temporary dataframe that matches the database dimensions
 
@@ -253,7 +254,6 @@ class SQLFrame():
         '''
         mirror_df = pd.DataFrame(columns=self._sql_columns).set_index(self._index_name).astype(object) 
         mirror_df[self._index_name] = self._sql_index
-        mirror_df = mirror_df.replace({np.nan:None}) # TODO Is this really necessary? I think SQLite NULL may already be represented as None
         return mirror_df.set_index(self._index_name)
 
     # NOTE Not a property method because a property method self.connection suggests that a connection is an attribute that
