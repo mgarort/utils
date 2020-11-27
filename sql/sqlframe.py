@@ -101,7 +101,7 @@ class SQLFrameLoc():
         idx_selected, col_selected = self._format_selection(idx_and_col_selected)
         #return self.sqlframe._tmp_df.loc[idx_selected,col_selected].combine_first(self._sql_loc(idx_selected,col_selected))#.loc[idx_and_col_selected]
         mask_is_null = self.sqlframe._tmp_df.loc[idx_selected,col_selected].isnull()
-        mask_is_not_none = check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected])
+        mask_is_not_none = np.logical_not(check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected]))
         mask_is_nan = mask_is_not_none & mask_is_null
         return self.sqlframe._tmp_df.loc[idx_selected,col_selected].mask(mask_is_nan,self._sql_loc(idx_selected,col_selected))
         # TODO What if the SQL stores a "None"? In that case, combine_first doesn't replace the values in tmp_df by the values in the SQL table, and we get
