@@ -57,6 +57,13 @@ def get_type_string(object):
     '''
     return type(object).__name__
 
+def check_is_none(elem):
+    '''
+    Utility functions to check whether an element of a Numpy array is None. Remember that some functions
+    have a hard time distinguishing None from np.nan (such as pandas isnull()/isna() )
+    '''
+    return (elem is None)
+check_is_none_array = np.frompyfunc(check_is_none,1,1)
 
 
 
