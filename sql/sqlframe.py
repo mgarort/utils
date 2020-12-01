@@ -103,9 +103,8 @@ class SQLFrameLoc():
         mask_is_null = self.sqlframe._tmp_df.loc[idx_selected,col_selected].isnull()
         mask_is_not_none = np.logical_not(check_is_none_array(self.sqlframe._tmp_df.loc[idx_selected,col_selected]))
         mask_is_nan = mask_is_not_none & mask_is_null
-        __import__('pdb').set_trace()
         return (self.sqlframe._tmp_df.loc[idx_selected,col_selected]
-                .mask(mask_is_nan,self._sql_loc(idx_selected,col_selected)) # Return the temporary dataframe, with NaN values filled by the SQL table
+                .mask(mask_is_nan.astype(bool),self._sql_loc(idx_selected,col_selected)) # Return the temporary dataframe, with NaN values filled by the SQL table
                 .loc[idx_and_col_selected])  # This final selection is done so that the return shape is equivalent to that of a DataFrame)
         # TODO What if the SQL stores a "None"? In that case, combine_first doesn't replace the values in tmp_df by the values in the SQL table, and we get
         # NaN (what is in the table) instead of "None".
@@ -305,6 +304,10 @@ class SQLFrame():
         - df: dataframe to append (syntax is the same as appending to a pandas.DataFrame)
         - verify_integrity: if True, raises ValueError on creating index with duplicates
         '''
+
+        if not isinstance(df, pd.core.frame.DataFrame):
+            raise TypeError('Data to append must be a dataframe. Convert to dataframe type before appending.')
+
         if verify_integrity: # NOTE In the original pandas, verify_integrity is False by default
             if df.index.isin(self.index).any():
                 raise ValueError('Tried to append datapoint whose index is already in the database.') # ValueError because verify_integrity in pandas raises
@@ -389,6 +392,7 @@ class SQLFrame():
     #   and if so throws an error
     
     def __repr__(self):
+        __import__('pdb').set_trace()
         n_rows = self.shape[0]
         pd_max_rows = pd.options.display.max_rows # Maximum number of rows printed by pandas to screen
         if pd_max_rows == 0:
@@ -396,6 +400,7 @@ class SQLFrame():
         # If our dataframe has more rows than pd_max_rows, we'll send to screen just a little bit more so that it gets printed with ... ,
         # and we'll manually set the number of columns and rows in the last line of output
         need_to_trim = True if n_rows > pd_max_rows else False
+        __import__('pdb').set_trace()
         if need_to_trim:
             n_head_and_tail = int(np.ceil((pd_max_rows+2)/2)) # Number of rows from the head and tail of the dataframe to print to screen
             idx_to_print = self.index[:n_head_and_tail].append(self.index[-n_head_and_tail:])  
