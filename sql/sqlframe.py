@@ -9,11 +9,10 @@ from .modifications import (SQLFrameModification, SQLFrameUpdate, SQLFrameAppend
 from utils.sql.statements import compose_statement_insert_rows, compose_statement_create_table, compose_statement_select_rows_by_id
 from ..datascience import get_type_string, check_is_none_array
 
-# Adapter and converter so that we can save numpy arrays to SQLite
+# Adapters and converters so that we can save:
+# - numpy arrays
+# - booleans
 def adapt_array(arr):
-    """
-    http://stackoverflow.com/a/31312102/190597 (SoulNibbler)
-    """
     out = io.BytesIO()
     np.save(out, arr)
     out.seek(0)
@@ -22,10 +21,24 @@ def convert_array(text):
     out = io.BytesIO(text)
     out.seek(0)
     return np.load(out)
-# Converts np.array to TEXT when inserting
+def adapt_bool(boolean):
+    return int(boolean)
+def convert_bool(integer):
+    '''
+    This function converts from "integer" to boolean. However, remember that Pandas dataframes
+    cannot hold integers and NaNs in the same column, so as soon as there is a NaN in the column,
+    integers will become floats (which is why "integer" was quoted before).
+    '''
+    if np.nan(integer) or integer is None:
+        return None
+    else:
+        return bool(integer)
+# Converts np.array to TEXT when inserting, and convert back when selecting
 sqlite3.register_adapter(np.ndarray, adapt_array)
-# Converts TEXT to np.array when selecting
 sqlite3.register_converter('ndarray', convert_array)
+# Converts bool to INT when inserting, and converts back when selecting
+sqlite3.register_adapter(bool,adapt_bool)
+sqlite3.register_converter('bool',convert_bool)
 
 def get_sqlite_connection(path):
     try:
@@ -392,7 +405,6 @@ class SQLFrame():
     #   and if so throws an error
     
     def __repr__(self):
-        __import__('pdb').set_trace()
         n_rows = self.shape[0]
         pd_max_rows = pd.options.display.max_rows # Maximum number of rows printed by pandas to screen
         if pd_max_rows == 0:
@@ -400,7 +412,6 @@ class SQLFrame():
         # If our dataframe has more rows than pd_max_rows, we'll send to screen just a little bit more so that it gets printed with ... ,
         # and we'll manually set the number of columns and rows in the last line of output
         need_to_trim = True if n_rows > pd_max_rows else False
-        __import__('pdb').set_trace()
         if need_to_trim:
             n_head_and_tail = int(np.ceil((pd_max_rows+2)/2)) # Number of rows from the head and tail of the dataframe to print to screen
             idx_to_print = self.index[:n_head_and_tail].append(self.index[-n_head_and_tail:])  

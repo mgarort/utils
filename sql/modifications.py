@@ -67,7 +67,6 @@ class SQLFrameAppend(SQLFrameModification):
         - indices_appended: indices of the rows that are appended
         '''
         super().__init__(sqlframe)
-        print(indices_appended)
         self.indices_appended = indices_appended
         all_tmp_columns = self.sqlframe._tmp_df.reset_index().columns
         self.statement = compose_statement_insert_rows(all_tmp_columns) # TODO Could be list of statements if updating several rows. Change to statementS, maybe
@@ -76,7 +75,6 @@ class SQLFrameAppend(SQLFrameModification):
         cursor = connection.cursor()
         # Append each row iteratively
         for idx in self.indices_appended:
-            __import__('pdb').set_trace()
             values = self.sqlframe._tmp_df.loc[[idx]].reset_index().iloc[0].tolist()
             cursor.execute(self.statement,values)
 
@@ -114,13 +112,11 @@ class SQLFrameAddSingleColumn(SQLFrameModification):
     def push(self,connection):
         # Add the new column
         cursor = connection.cursor()
-        __import__('pdb').set_trace()
         cursor.execute(self.add_column_statement)
         connection.commit()
         # Fill it
         for idx, statement in zip(self.sqlframe._tmp_df.index, self.fill_column_statements):
             value = [self.sqlframe._tmp_df.loc[idx,self.col_name[0]]]
-            __import__('pdb').set_trace()
             cursor.execute(statement,value)
 
     
