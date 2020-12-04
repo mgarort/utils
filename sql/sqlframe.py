@@ -434,6 +434,9 @@ class SQLFrame():
 # index name. Instead of having "my_table", this one could be called "data_table", and the index table could be called "index_table", 
 # with a single columns of type string called "index_name"
 def read_sqlframe(path,index):
+    # Make sure that file exists
+    if not os.path.isfile(path):
+        raise ValueError('No file found at path given.')
     # Get column and type info
     connection = get_sqlite_connection(path)
     cursor = connection.cursor()
