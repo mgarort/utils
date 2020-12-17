@@ -75,6 +75,37 @@ def compute_dims_after_maxpool3d(x, kernel_size, stride=None, padding=0, dilatio
     return (int(n_out), int(c_out), int(d_out), int(h_out), int(w_out))
 
 
+
+
+def compute_dims_after_layers(self,input_dimensions,list_of_layers):
+    '''This method will compute the dimensions of an input after a forward pass through a list of layers,
+    excluding the batch size
+    - input_dimensions: dimensions that the input would have, including the batch dimension as the first dimension (although
+                        the batch dimension will be ignored in the computation)
+    - list_of layers: must be in the typical form:
+        - A list of dictionaries in the desired layer order.
+        - One dictionary per layer.
+        - Each dictionary must have two keys:
+            - 'type': Pytorch layer module, like nn.Linear)
+            - 'args': dictionary with parameters for the layer initialization.
+    '''
+    # Initialize the layers to forward through
+    layers = []
+    for layer_param in list_of_layers:
+        layer = layer_param['type'](**layer_param['args'])
+        layers.append(layer)
+    # Forward through the layers
+    x = torch.ones(input_dimensions)
+    for layer in layers:
+        x = layer(x)
+    # Return the dimensions (excluding batch dimension x.shape[0], since we want to compute dimensions per input)
+    dims_after_layers = x.shape[1:]
+    return dims_after_layers
+
+
+
+
+
 class View(nn.Module):
     '''This class is implemented so that we can use torch.Tensor.view as a layer in a network. This allows us to 
     unroll the output of convolutional/pooling layers so that they can be fed into a torch.nn.Linear layer. 
@@ -106,5 +137,52 @@ class LinearActivated(nn.Module):
     def forward(self,x):
         return self.activation(self.linear(x))
 
-    
+
+class ChangeableCNN(nn.Module):
+    '''
+    CNN whose architecture can be determined with a parameter dictionary.
+    '''
+
+    def __init__(self,params):
+        '''
+        params contains the architecture of the network. To see the required structure, go to docking/tasks/main.py
+        CNN tasks.
+        '''
+        super().__init__() # TODO Check if this syntax works, or I should go back to the old super(Net, self).__init__()
+        # The number of input elements to the fully connected layers had been left blank in the parameters
+        # Find where the convolutional/pooling layers end (and where view and fc layers begin)
+        n_view_layers = 0
+        for layer_param in self.params['layers']:
+            if layer_param['type'] != View:
+                n_view_layers += 1
+            else:
+                break
+        idx_first_fc_layer = n_view_layers + 1
+        # Compute number of elements before the first fully connected layer
+        conv_and_pool_layers = self.params['layers'][:n_view_layers]
+        n_elem_before_fc = compute_dims_after_layers(self.params['input_dimensions'],
+                                                                  conv_and_pool_layers)
+        print('Number of elements before fully connected:', n_elem_before_fc)
+        # Save the number of elements before the fc layers as:
+        # - out_features of the View layer
+        # - in_features of the first fc layer
+        view_layer = self.params['layers'][n_view_layers]
+        view_layer['args']['out_features'] = n_elem_before_fc
+        first_fc_layer = self.params['layers'][idx_first_fc_layer]
+        first_fc_layer['args']['in_features'] = n_elem_before_fc
+        # Initialize the layers
+        self.layers = []
+        for layer_param in self.params['layers']:
+            layer = layer_param['type'](**layer_param['args'])    # For instance: - layer['type'] could be nn.linear, 
+                                                                  #               - layer['args'] could be {'in_features':100, 'out_features':20}
+            self.layers.append(layer)
+        # Wrap layers in nn.ModuleList, which is necessary to register parameters properly
+        self.layers = nn.ModuleList(self.layers)
+
+    def forward(self, x):
+        # Just the same as before, but we don't pass the output through the last layer
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
 
