@@ -77,7 +77,7 @@ def compute_dims_after_maxpool3d(x, kernel_size, stride=None, padding=0, dilatio
 
 
 
-def compute_dims_after_layers(self,input_dimensions,list_of_layers):
+def compute_dims_after_layers(input_dimensions,list_of_layers):
     '''This method will compute the dimensions of an input after a forward pass through a list of layers,
     excluding the batch size
     - input_dimensions: dimensions that the input would have, including the batch dimension as the first dimension (although
@@ -151,28 +151,28 @@ class ChangeableCNN(nn.Module):
         super().__init__() # TODO Check if this syntax works, or I should go back to the old super(Net, self).__init__()
         # The number of input elements to the fully connected layers had been left blank in the parameters
         # Find where the convolutional/pooling layers end (and where view and fc layers begin)
-        n_view_layers = 0
-        for layer_param in self.params['layers']:
+        n_conv_layers = 0
+        for layer_param in params['layers']:
             if layer_param['type'] != View:
-                n_view_layers += 1
+                n_conv_layers += 1
             else:
                 break
-        idx_first_fc_layer = n_view_layers + 1
+        idx_first_fc_layer = n_conv_layers + 1
         # Compute number of elements before the first fully connected layer
-        conv_and_pool_layers = self.params['layers'][:n_view_layers]
-        n_elem_before_fc = compute_dims_after_layers(self.params['input_dimensions'],
-                                                                  conv_and_pool_layers)
+        conv_and_pool_layers = params['layers'][:n_conv_layers]
+        n_dims_before_fc = compute_dims_after_layers(params['input_dimensions'], conv_and_pool_layers)
+        n_elem_before_fc = torch.prod(torch.tensor(n_dims_before_fc))
         print('Number of elements before fully connected:', n_elem_before_fc)
         # Save the number of elements before the fc layers as:
         # - out_features of the View layer
         # - in_features of the first fc layer
-        view_layer = self.params['layers'][n_view_layers]
+        view_layer = params['layers'][n_conv_layers]
         view_layer['args']['out_features'] = n_elem_before_fc
-        first_fc_layer = self.params['layers'][idx_first_fc_layer]
+        first_fc_layer = params['layers'][idx_first_fc_layer]
         first_fc_layer['args']['in_features'] = n_elem_before_fc
         # Initialize the layers
         self.layers = []
-        for layer_param in self.params['layers']:
+        for layer_param in params['layers']:
             layer = layer_param['type'](**layer_param['args'])    # For instance: - layer['type'] could be nn.linear, 
                                                                   #               - layer['args'] could be {'in_features':100, 'out_features':20}
             self.layers.append(layer)
