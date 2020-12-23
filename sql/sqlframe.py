@@ -16,12 +16,13 @@ def adapt_array(arr):
     out = io.BytesIO()
     np.save(out, arr)
     out.seek(0)
-    return sqlite3.Binary(out.read())
+    return out.read()
 def convert_array(text):
     out = io.BytesIO(text)
     out.seek(0)
     return np.load(out)
 def adapt_bool(boolean):
+    out = io.BytesIO()
     return int(boolean)
 def convert_bool(integer):
     '''
@@ -29,10 +30,11 @@ def convert_bool(integer):
     cannot hold integers and NaNs in the same column, so as soon as there is a NaN in the column,
     integers will become floats (which is why "integer" was quoted before).
     '''
-    if np.nan(integer) or integer is None:
-        return None
-    else:
-        return bool(integer)
+    #if np.isnan(integer) or integer is None:
+    #    return None
+    #else:
+    #    return bool(integer)
+    return integer != '0'
 # Converts np.array to TEXT when inserting, and convert back when selecting
 sqlite3.register_adapter(np.ndarray, adapt_array)
 sqlite3.register_converter('ndarray', convert_array)
@@ -160,8 +162,6 @@ class SQLFrameLoc():
         else:
             NotImplementedError('Allowed actions are to update values in existing columns, or to create a new single column.')
 
-
-
 class SQLFrameIloc():
     def __init__(self,sqlframe):
         '''
@@ -190,12 +190,16 @@ class SQLFrame():
 
     # NOTE A SQLFrame is a sqlite3 database with a single table. The name of the table can always be the same, and it can be "table"
 
+    # TODO Implement method to delete rows and columns
+
 
 
     def __init__(self,path,base_dataframe,_create_from_scratch=True,_modification_queue=None,_tmp_df=None):
         '''
         If path is given, then init loads the database in the path. Otherwise, it creates a new database.
         - path: path for the database to be created
+        - base_dataframe: a base dataframe is provided. In the current implementation, we only copy the 
+                          columns and indices of the base dataframe, but not the actual values.
         - index: name of the column to use as index in the resulting database
         - columns: list with columns of the database to be created. The first column will be the index
         - types: dict with the types of the columns that will be used (necessary for adapters and converters, which will be useful for arrays).
