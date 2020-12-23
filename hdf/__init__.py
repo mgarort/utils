@@ -1,5 +1,6 @@
-from .hframe import HFrame
+from .hframe import HFrame, read_hframe
 
 __all__ = [
-'HFrame'
+'HFrame',
+'read_hframe',
 ]
