@@ -156,9 +156,8 @@ class HFrame():
         Given a datapoint index, which is also the name of a group in the HDF5 file,
         convert that group to a dataseries.
         '''
-        series = pd.Series(index=self.columns,name=index)
-        for column in series.index:
-            series[column] = self._hf[index][column][...]
+        data = [self._hf[index][column][...] for column in self.columns]
+        series = pd.Series(data=data,index=self.columns,name=index)
         return series
 
     # Methods to close and clean up
@@ -184,6 +183,7 @@ class HFrame():
         '''
         # You should iterate over the items in the HFrame and obtain the value of idx for each of the items
         pass
+
 
     @modification
     def __setitem__(self,column,value):
