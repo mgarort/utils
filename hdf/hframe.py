@@ -2,6 +2,10 @@ import h5py
 import pandas as pd
 
 
+def convert_bytes_array_to_str(cell):
+    return str(cell.astype(str))
+
+
 def modification(foo):
     '''
     Decorator for all methods that modify the frame, which should
@@ -14,10 +18,7 @@ def modification(foo):
         else:
             raise RuntimeError('To modify HFrame, set HFrame.modifiable = True')
     return wrapper
-            
-    
 
-        
 
 class Iloc():
 
