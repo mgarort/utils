@@ -157,8 +157,7 @@ class HFrame():
         convert that group to a dataseries.
         '''
         data = [self._hf[index][column][...] for column in self.columns]
-        series = pd.Series(data=data,index=self.columns,name=index)
-        return series
+        return pd.Series(data=data,index=self.columns,name=index)
 
     # Methods to close and clean up
     def __del__(self):
@@ -182,7 +181,8 @@ class HFrame():
         For HFrame[column] access. 
         '''
         # You should iterate over the items in the HFrame and obtain the value of idx for each of the items
-        pass
+        data = [self._hf[index][column][...] for index in self.index]
+        return pd.Series(data=data,index=self.index,name=column)
 
 
     @modification
