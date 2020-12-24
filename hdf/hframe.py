@@ -185,13 +185,20 @@ class HFrame():
         data = [self._hf[index][column][...] for index in self.index]
         return pd.Series(data=data,index=self.index,name=column)
 
-
     @modification
     def __setitem__(self,column,value):
         '''
         For HFrame[column] = value  setting.
         '''
         pass
+
+    # Methods to examine the HFrame
+    def __len__(self):
+        return len(self.index)
+
+    @property
+    def shape(self):
+        return len(self.index), len(self.columns)
 
 
 def read_hframe(path):
