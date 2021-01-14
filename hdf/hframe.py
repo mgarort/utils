@@ -93,7 +93,7 @@ class HFrame():
             mode = 'w'
         else:
             mode = 'r+'
-        self._hf = h5py.File(path,mode)
+        self._hf = h5py.File(path,mode,track_order=True)
         self._index = pd.Index([])
 
     # To begin with, index will only be able to work with inchikeys. So we have index only for the ordering, but not
