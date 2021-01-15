@@ -204,7 +204,11 @@ class HFrame():
 def read_hframe(path):
 
     hf = HFrame(path=path,columns=[],create_from_scratch=False)
-    hf._index = pd.Index(hf._hf.keys())
+    # In the following, hf._hf['/'].keys() is needed instead of hf._hf.keys() because
+    # if we use hf._hf.keys(), the order of the root group is not kept because of a bug
+    # see (https://github.com/h5py/h5py/issues/1577) and so the index order is not
+    # maintained
+    hf._index = pd.Index(hf._hf['/'].keys())
     # Columns are obtained as the keys of the first group
     hf.columns = pd.Index(hf._hf[hf.index[0]].keys())
 
