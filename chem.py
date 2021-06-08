@@ -88,14 +88,14 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column,keep
     """
     Given a dataframe where each row is a molecule and each column is a chemical property or chemical id,
     it returns the same dataframe with an additional column for a new chemical property or chemical id.
-    
+
     df: Chemical dataframe to extend.
     input_format: string indicating molecular identifier used as input (smiles, canon smiles, inchi...).
     input_column: string indicating column name to use as input.
     output_format: string indicating molecular identifier or property used as output (smiles, canon smiles, inchi, inchi key, morgan fingerprints...).
     output_column: string indicating name of new column.
     keep_None: keep or delete null values None obtained either because the conversion failed or because the input was None to begin with. Default True.
-    
+
     returns: extended dataframe.
     """
 
@@ -161,10 +161,13 @@ def get_score_from_vina_logfile(logfile):
         return score
 
 
-def get_pubchem_date(cid):
+def get_pubchem_date(identifier,identifier_type='cid'):
     """Get the creation date of a compound in PubChem from the compound id (cid)"""
-    cid = str(int(cid))
-    rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
+    if identifier_type == 'cid' or identifier_type == 'CID':
+        cid = str(int(cid))
+        rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
+    elif identifier_type  == 'smiles' or identifier_type == 'SMILES':
+        rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/' + smiles + '/dates/json'
     resp = requests.get(rest_request).json()
     if 'Fault' in resp.keys():
         print(resp['Fault']['Message'])
