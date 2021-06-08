@@ -128,9 +128,9 @@ def expand_chem_df(df,input_format,input_column,output_format,output_column,keep
 def smile2pdbfile(smile,filename,keep_hydrogens=True,random_seed=2342,n_attempts=10):
     for idx_attempt in range(n_attempts):
         try:
-            # Simple, meaningless expression to get a different random seed per attempt, 
+            # Simple, meaningless expression to get a different random seed per attempt,
             # but still keep the first random seed to that which was set manually
-            random_seed = random_seed + idx_attempt * random_seed  
+            random_seed = random_seed + idx_attempt * random_seed
             mol = Chem.MolFromSmiles(smile)
             mol = Chem.AddHs(mol) # Always add hydrogens in order to get a sensible 3D structure. Hydrogens can be removed later
             AllChem.EmbedMolecule(mol,randomSeed=random_seed)
