@@ -3,6 +3,10 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
 from functools import partial
 import numpy as np
+import json
+import requests
+from datetime import date
+import time
 
 
 def get_max_min_coord(input_pdb):
@@ -160,18 +164,52 @@ def get_score_from_vina_logfile(logfile):
         score = line_with_score.split()[1]
         return score
 
+def attempt_retrieving_pubchem_date(identifier, identifier_type='cid'):
+    """
+    Try to retrieve a date up to 5 times.
+    """
+    keep_trying = True
+    num_tries = 0
+    while keep_trying:
+        if identifier_type == 'cid' or identifier_type == 'CID':
+            cid = str(int(identifier))
+            rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
+            resp = requests.get(rest_request)
+        elif identifier_type  == 'smiles' or identifier_type == 'SMILES':
+            smiles = identifier
+            resp = requests.post('https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/dates/JSON',
+                                 headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                                 data={'smiles':smiles})
+        # If we have tried more than 5 times already, desist
+        if num_tries > 5:
+            keep_trying = False
+        # If the server is busy or you have done too many requests (code 503) or if
+        # the request has timed out (request 504), wait a little and try to get the date again
+        elif resp.status_code == 503 or resp.status_code == 504:
+            time.sleep(5)
+            num_tries += 1
+        # If the return is not any of the previous ones, either we have succeeded or the problem
+        # cannot be fixed by trying again
+        else:
+            keep_trying = False
+    return resp
 
 def get_pubchem_date(identifier,identifier_type='cid'):
     """Get the creation date of a compound in PubChem from the compound id (cid)"""
-    if identifier_type == 'cid' or identifier_type == 'CID':
-        cid = str(int(cid))
-        rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/' + cid + '/dates/json'
-    elif identifier_type  == 'smiles' or identifier_type == 'SMILES':
-        rest_request = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/' + smiles + '/dates/json'
-    resp = requests.get(rest_request).json()
+    resp = attempt_retrieving_pubchem_date(identifier,identifier_type)
+    # Because of an error in the connection the response may be incomplete or corrupted and the
+    # JSON cannot be decoded. In this case, try again
+    is_resp_decodable = False
+    while not is_resp_decodable:
+        try:
+            resp = resp.json()
+            is_resp_decodable = True
+        except json.decoder.JSONDecodeError:
+            resp = attempt_retrieving_pubchem_date(identifier,identifier_type)
+    # If error return None. Otherwise return date
     if 'Fault' in resp.keys():
         print(resp['Fault']['Message'])
-        return 'None'
+        return None
     else:
         creation_date = resp['InformationList']['Information'][0]['CreationDate']
         return date(year=creation_date['Year'],month=creation_date['Month'],day=creation_date['Day'])
